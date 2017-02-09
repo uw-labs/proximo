@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package pubsub;
+
+service MessageSource {
+	rpc Consume(stream Request) returns (stream Message) {}
+}
+
+message Message {
+  bytes data  = 1;
+  string id = 2;
+}
+
+message Request {
+  // expected if this is a start request
+  StartRequest startRequest=2;
+  // expected if this is a confirmation
+  Confirmation confirmation=3;
+}
+
+message StartRequest {
+  string topic=1;
+  string consumer=2;
+}
+
+message Confirmation {
+  string msgID = 1;
+}
+
+message Config {
+  string consumer = 1;
+  string topic = 2;
+}
+
