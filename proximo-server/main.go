@@ -47,5 +47,29 @@ func main() {
 		}
 	})
 
+	app.Command("amqp", "Use AMQP backend", func(cmd *cli.Cmd) {
+		address := cmd.String(cli.StringOpt{
+			Name:   "address",
+			Value:  "amqp://localhost:5672",
+			Desc:   "Broker address",
+			EnvVar: "PROXIMO_AMQP_ADDRESS",
+		})
+		cmd.Action = func() {
+
+			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+			if err != nil {
+				grpclog.Fatalf("failed to listen: %v", err)
+			}
+			var opts []grpc.ServerOption
+			grpcServer := grpc.NewServer(opts...)
+			kh := &amqpHandler{
+				address: *address,
+			}
+			grpclog.Printf("%#v\n", address)
+			proximo.RegisterMessageSourceServer(grpcServer, &consumeServer{kh.handle})
+			grpclog.Fatal(grpcServer.Serve(lis))
+		}
+	})
+
 	grpclog.Fatal(app.Run(os.Args))
 }
