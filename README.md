@@ -6,5 +6,7 @@ It is an RPC based API definition, a collection of client libraries, and a serve
 Currently under heavy development and not even remotely usable.
 
 [protobuf definitions](proto/)
+
 [proximo server](proximo-server/README.md)
+
 [Go client library](proximoc-go)
