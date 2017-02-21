@@ -30,31 +30,47 @@ func ConsumeContext(ctx context.Context, proximoAddress string, consumer string,
 	defer stream.CloseSend()
 
 	handled := make(chan string)
-	errs := make(chan error)
+	errs := make(chan error, 2)
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
+
+	ins := make(chan *proximo.Message, 16) // TODO: make buffer size configurable?
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(ins)
+		for {
+			in, err := stream.Recv()
+			if err != nil {
+				if err != io.EOF && grpc.Code(err) != 1 { // 1 means cancelled
+					errs <- err
+				}
+				return
+			}
+			ins <- in
+		}
+	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for {
-			in, err := stream.Recv()
-			if err != nil {
-				if err == io.EOF {
-					// read done.
-					errs <- nil
-				} else {
-					errs <- err
-				}
-				return
-			}
-			if err := f(in); err != nil {
-				errs <- err
-				return
-			}
 			select {
-			case handled <- in.GetId():
+			case in, ok := <-ins:
+				if !ok {
+					return
+				}
+				if err := f(in); err != nil {
+					errs <- err
+					return
+				}
+				select {
+				case handled <- in.GetId():
+				case <-ctx.Done():
+					return
+				}
 			case <-ctx.Done():
 				return
 			}
