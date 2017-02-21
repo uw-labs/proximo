@@ -33,6 +33,8 @@ func ConsumeContext(ctx context.Context, proximoAddress string, consumer string,
 	errs := make(chan error)
 
 	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -51,7 +53,11 @@ func ConsumeContext(ctx context.Context, proximoAddress string, consumer string,
 				errs <- err
 				return
 			}
-			handled <- in.GetId()
+			select {
+			case handled <- in.GetId():
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
@@ -72,10 +78,10 @@ func ConsumeContext(ctx context.Context, proximoAddress string, consumer string,
 			}
 		case err := <-errs:
 			return err
+		case <-ctx.Done():
+			return nil //ctx.Err()
 		}
 
 	}
 
-	wg.Wait()
-	return nil
 }
