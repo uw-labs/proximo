@@ -25,7 +25,7 @@ func (h *kafkaHandler) handle(ctx context.Context, consumer, topic string, forCl
 	// TODO: un hardcode some of this stuff
 	config := cluster.NewConfig()
 	config.Consumer.Return.Errors = true
-	config.Consumer.Offsets.Initial = sarama.OffsetNewest
+	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	config.Metadata.RefreshFrequency = 30 * time.Second
 
 	c, err := cluster.NewConsumer(h.brokers, consumer, []string{topic}, config)
