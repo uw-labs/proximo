@@ -68,8 +68,16 @@ func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClie
 		select {
 		case msg := <-c.Messages():
 			confirmID := fmt.Sprintf("%d-%d", msg.Offset, msg.Partition)
-			forClient <- &proximo.Message{Data: msg.Value, Id: confirmID}
-			toConfirmID <- confirmID
+			select {
+			case forClient <- &proximo.Message{Data: msg.Value, Id: confirmID}:
+			case <-ctx.Done():
+				return c.Close()
+			}
+			select {
+			case toConfirmID <- confirmID:
+			case <-ctx.Done():
+				return c.Close()
+			}
 		case err := <-c.Errors():
 			return err
 		case <-ctx.Done():
