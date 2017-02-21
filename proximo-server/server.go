@@ -67,7 +67,7 @@ func (s *consumeServer) Consume(stream proximo.MessageSource_ConsumeServer) erro
 		topic = sr.GetTopic()
 		consumer = sr.GetConsumer()
 	case <-ctx.Done():
-		return ctx.Err()
+		return nil //ctx.Err()
 	}
 
 	forClient := make(chan *proximo.Message)
