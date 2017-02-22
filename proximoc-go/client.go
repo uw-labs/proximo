@@ -90,6 +90,9 @@ func ConsumeContext(ctx context.Context, proximoAddress string, consumer string,
 		select {
 		case id := <-handled:
 			if err := stream.Send(&proximo.Request{Confirmation: &proximo.Confirmation{MsgID: id}}); err != nil {
+				if grpc.Code(err) == 1 {
+					return nil
+				}
 				return err
 			}
 		case err := <-errs:
