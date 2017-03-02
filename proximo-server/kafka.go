@@ -17,7 +17,7 @@ type kafkaHandler struct {
 	brokers []string
 }
 
-func (h *kafkaHandler) handle(ctx context.Context, consumer, topic string, forClient chan *proximo.Message, confirmRequest chan *proximo.Confirmation) error {
+func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *proximo.Message, confirmRequest <-chan *proximo.Confirmation) error {
 	toConfirmIds := make(chan string)
 
 	errors := make(chan error)
@@ -59,7 +59,7 @@ func (h *kafkaHandler) handle(ctx context.Context, consumer, topic string, forCl
 	}
 }
 
-func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClient chan *proximo.Message, toConfirmID chan string, topic, consumer string) error {
+func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClient chan<- *proximo.Message, toConfirmID chan string, topic, consumer string) error {
 
 	grpclog.Println("started consume loop")
 	defer grpclog.Println("exited consume loop")
@@ -105,4 +105,36 @@ func (h *kafkaHandler) confirm(ctx context.Context, c *cluster.Consumer, id stri
 	case <-ctx.Done():
 	}
 	return nil
+}
+
+func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *proximo.Confirmation, messages <-chan *proximo.Message) error {
+	conf := sarama.NewConfig()
+	conf.Producer.Return.Successes = true
+
+	sp, err := sarama.NewSyncProducer(h.brokers, conf)
+	if err != nil {
+		return err
+	}
+	defer sp.Close()
+
+	for {
+		select {
+		case m := <-messages:
+			pm := &sarama.ProducerMessage{
+				Topic: topic,
+				Value: sarama.ByteEncoder(m.GetData()),
+				// Key = TODO:
+			}
+
+			_, _, err = sp.SendMessage(pm)
+			if err != nil {
+				return err
+			}
+			forClient <- &proximo.Confirmation{m.GetId()}
+		case <-ctx.Done():
+			return nil
+		}
+	}
+
+	return sp.Close()
 }

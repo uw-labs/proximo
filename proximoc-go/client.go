@@ -2,7 +2,11 @@ package proximoc
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"errors"
 	"io"
+	"log"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -77,8 +81,8 @@ func ConsumeContext(ctx context.Context, proximoAddress string, consumer string,
 		}
 	}()
 
-	if err := stream.Send(&proximo.Request{
-		StartRequest: &proximo.StartRequest{
+	if err := stream.Send(&proximo.ConsumerRequest{
+		StartRequest: &proximo.StartConsumeRequest{
 			Topic:    topic,
 			Consumer: consumer,
 		},
@@ -89,7 +93,7 @@ func ConsumeContext(ctx context.Context, proximoAddress string, consumer string,
 	for {
 		select {
 		case id := <-handled:
-			if err := stream.Send(&proximo.Request{Confirmation: &proximo.Confirmation{MsgID: id}}); err != nil {
+			if err := stream.Send(&proximo.ConsumerRequest{Confirmation: &proximo.Confirmation{MsgID: id}}); err != nil {
 				if grpc.Code(err) == 1 {
 					return nil
 				}
@@ -103,4 +107,166 @@ func ConsumeContext(ctx context.Context, proximoAddress string, consumer string,
 
 	}
 
+}
+
+func DialProducer(ctx context.Context, proximoAddress string, topic string) (*ProducerConn, error) {
+	var opts []grpc.DialOption
+	opts = append(opts, grpc.WithInsecure())
+
+	conn, err := grpc.Dial(proximoAddress, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	client := proximo.NewMessageSinkClient(conn)
+
+	stream, err := client.Publish(ctx)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	if err := stream.Send(&proximo.PublisherRequest{
+		StartRequest: &proximo.StartPublishRequest{
+			Topic: topic,
+		},
+	}); err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	pc := &ProducerConn{conn, ctx, cancel, stream, make(chan req), make(chan error), sync.WaitGroup{}}
+	pc.start()
+	return pc, nil
+}
+
+type req struct {
+	data []byte
+	resp chan error
+}
+
+type ProducerConn struct {
+	cc *grpc.ClientConn
+
+	ctx    context.Context
+	cancel func()
+
+	stream proximo.MessageSink_PublishClient
+
+	reqs chan req
+
+	errs chan error
+
+	wg sync.WaitGroup
+}
+
+func (p *ProducerConn) Produce(message []byte) error {
+	err := make(chan error)
+	r := req{message, err}
+	p.reqs <- r
+	var e error
+	select {
+	case e = <-err:
+	case e = <-p.errs:
+	case <-p.ctx.Done():
+	}
+	return e
+}
+
+func (p *ProducerConn) Close() error {
+	p.cancel()
+	err := p.cc.Close()
+	p.wg.Wait()
+	return err
+}
+
+func (p *ProducerConn) start() error {
+
+	//	defer p.stream.CloseSend()
+
+	confirmations := make(chan *proximo.Confirmation, 16) // TODO: make buffer size configurable?
+
+	recvErr := make(chan error, 1)
+
+	p.wg.Add(1)
+	go func() {
+		defer p.wg.Done()
+		for {
+			conf, err := p.stream.Recv()
+			if err != nil {
+				if err != io.EOF && grpc.Code(err) != 1 { // 1 means cancelled
+					recvErr <- err
+				}
+				return
+			}
+			confirmations <- conf
+		}
+	}()
+
+	idErr := make(map[string]chan error)
+
+	p.wg.Add(1)
+	go func() {
+		defer p.wg.Done()
+		var lerr error
+
+	mainLoop:
+		for {
+			select {
+			case err := <-recvErr:
+				lerr = err
+				break mainLoop
+			case in := <-confirmations:
+				ec := idErr[in.GetMsgID()]
+				if ec == nil {
+					lerr = errUnexpectedMessageId
+					break mainLoop
+				}
+				ec <- nil
+				delete(idErr, in.GetMsgID())
+			case req := <-p.reqs:
+				id := makeId()
+				idErr[id] = req.resp
+				if err := p.stream.Send(&proximo.PublisherRequest{Msg: &proximo.Message{Data: req.data, Id: id}}); err != nil {
+					if grpc.Code(err) != 1 {
+						lerr = err
+						log.Printf("err error %v\n", err)
+					}
+					break mainLoop
+				}
+			case <-p.ctx.Done():
+				break mainLoop
+			}
+		}
+
+		var errs chan error
+		if lerr != nil {
+			errs = p.errs
+		}
+
+	errLoop:
+		for {
+			select {
+			case errs <- lerr:
+			case <-p.ctx.Done():
+				break errLoop
+			}
+		}
+	}()
+
+	return nil
+}
+
+var (
+	errUnexpectedMessageId = errors.New("unexpected message id")
+)
+
+func makeId() string {
+	random := []byte{0, 0, 0, 0, 0, 0, 0, 0}
+	_, err := rand.Read(random)
+	if err != nil {
+		panic(err)
+	}
+	return base64.URLEncoding.EncodeToString(random)
 }

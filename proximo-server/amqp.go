@@ -12,7 +12,7 @@ type amqpHandler struct {
 	address string
 }
 
-func (mq *amqpHandler) handle(ctx context.Context, consumer, topic string, forClient chan *proximo.Message, confirmRequest chan *proximo.Confirmation) error {
+func (mq *amqpHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *proximo.Message, confirmRequest <-chan *proximo.Confirmation) error {
 	conn, err := amqp.Dial(mq.address)
 	if err != nil {
 		return err
@@ -74,7 +74,6 @@ func (mq *amqpHandler) handle(ctx context.Context, consumer, topic string, forCl
 	errs := make(chan error, 1)
 	go func() {
 		for cr := range confirmRequest {
-			println("acking")
 
 			id, err := strconv.ParseUint(cr.GetMsgID(), 10, 64)
 			if err != nil {
@@ -99,4 +98,8 @@ func (mq *amqpHandler) handle(ctx context.Context, consumer, topic string, forCl
 			return err
 		}
 	}
+}
+
+func (h *amqpHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *proximo.Confirmation, messages <-chan *proximo.Message) error {
+	panic("not implemented")
 }

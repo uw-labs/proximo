@@ -42,7 +42,8 @@ func main() {
 				brokers: brokers,
 			}
 			grpclog.Printf("%#v\n", brokers)
-			proximo.RegisterMessageSourceServer(grpcServer, &consumeServer{kh.handle})
+			proximo.RegisterMessageSourceServer(grpcServer, &server{kh})
+			proximo.RegisterMessageSinkServer(grpcServer, &server{kh})
 			grpclog.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -66,7 +67,8 @@ func main() {
 				address: *address,
 			}
 			grpclog.Printf("%#v\n", address)
-			proximo.RegisterMessageSourceServer(grpcServer, &consumeServer{kh.handle})
+			proximo.RegisterMessageSourceServer(grpcServer, &server{kh})
+			proximo.RegisterMessageSinkServer(grpcServer, &server{kh})
 			grpclog.Fatal(grpcServer.Serve(lis))
 		}
 	})

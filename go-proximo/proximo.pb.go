@@ -10,10 +10,11 @@ It is generated from these files:
 
 It has these top-level messages:
 	Message
-	Request
-	StartRequest
+	ConsumerRequest
+	StartConsumeRequest
 	Confirmation
-	Config
+	PublisherRequest
+	StartPublishRequest
 */
 package proximo
 
@@ -61,50 +62,50 @@ func (m *Message) GetId() string {
 	return ""
 }
 
-type Request struct {
+type ConsumerRequest struct {
 	// expected if this is a start request
-	StartRequest *StartRequest `protobuf:"bytes,2,opt,name=startRequest" json:"startRequest,omitempty"`
+	StartRequest *StartConsumeRequest `protobuf:"bytes,2,opt,name=startRequest" json:"startRequest,omitempty"`
 	// expected if this is a confirmation
 	Confirmation *Confirmation `protobuf:"bytes,3,opt,name=confirmation" json:"confirmation,omitempty"`
 }
 
-func (m *Request) Reset()                    { *m = Request{} }
-func (m *Request) String() string            { return proto.CompactTextString(m) }
-func (*Request) ProtoMessage()               {}
-func (*Request) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+func (m *ConsumerRequest) Reset()                    { *m = ConsumerRequest{} }
+func (m *ConsumerRequest) String() string            { return proto.CompactTextString(m) }
+func (*ConsumerRequest) ProtoMessage()               {}
+func (*ConsumerRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
 
-func (m *Request) GetStartRequest() *StartRequest {
+func (m *ConsumerRequest) GetStartRequest() *StartConsumeRequest {
 	if m != nil {
 		return m.StartRequest
 	}
 	return nil
 }
 
-func (m *Request) GetConfirmation() *Confirmation {
+func (m *ConsumerRequest) GetConfirmation() *Confirmation {
 	if m != nil {
 		return m.Confirmation
 	}
 	return nil
 }
 
-type StartRequest struct {
+type StartConsumeRequest struct {
 	Topic    string `protobuf:"bytes,1,opt,name=topic" json:"topic,omitempty"`
 	Consumer string `protobuf:"bytes,2,opt,name=consumer" json:"consumer,omitempty"`
 }
 
-func (m *StartRequest) Reset()                    { *m = StartRequest{} }
-func (m *StartRequest) String() string            { return proto.CompactTextString(m) }
-func (*StartRequest) ProtoMessage()               {}
-func (*StartRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+func (m *StartConsumeRequest) Reset()                    { *m = StartConsumeRequest{} }
+func (m *StartConsumeRequest) String() string            { return proto.CompactTextString(m) }
+func (*StartConsumeRequest) ProtoMessage()               {}
+func (*StartConsumeRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
 
-func (m *StartRequest) GetTopic() string {
+func (m *StartConsumeRequest) GetTopic() string {
 	if m != nil {
 		return m.Topic
 	}
 	return ""
 }
 
-func (m *StartRequest) GetConsumer() string {
+func (m *StartConsumeRequest) GetConsumer() string {
 	if m != nil {
 		return m.Consumer
 	}
@@ -127,24 +128,42 @@ func (m *Confirmation) GetMsgID() string {
 	return ""
 }
 
-type Config struct {
-	Consumer string `protobuf:"bytes,1,opt,name=consumer" json:"consumer,omitempty"`
-	Topic    string `protobuf:"bytes,2,opt,name=topic" json:"topic,omitempty"`
+type PublisherRequest struct {
+	// expected if this is a start request
+	StartRequest *StartPublishRequest `protobuf:"bytes,2,opt,name=startRequest" json:"startRequest,omitempty"`
+	// expected if this is a message
+	Msg *Message `protobuf:"bytes,3,opt,name=msg" json:"msg,omitempty"`
 }
 
-func (m *Config) Reset()                    { *m = Config{} }
-func (m *Config) String() string            { return proto.CompactTextString(m) }
-func (*Config) ProtoMessage()               {}
-func (*Config) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
+func (m *PublisherRequest) Reset()                    { *m = PublisherRequest{} }
+func (m *PublisherRequest) String() string            { return proto.CompactTextString(m) }
+func (*PublisherRequest) ProtoMessage()               {}
+func (*PublisherRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
 
-func (m *Config) GetConsumer() string {
+func (m *PublisherRequest) GetStartRequest() *StartPublishRequest {
 	if m != nil {
-		return m.Consumer
+		return m.StartRequest
 	}
-	return ""
+	return nil
 }
 
-func (m *Config) GetTopic() string {
+func (m *PublisherRequest) GetMsg() *Message {
+	if m != nil {
+		return m.Msg
+	}
+	return nil
+}
+
+type StartPublishRequest struct {
+	Topic string `protobuf:"bytes,1,opt,name=topic" json:"topic,omitempty"`
+}
+
+func (m *StartPublishRequest) Reset()                    { *m = StartPublishRequest{} }
+func (m *StartPublishRequest) String() string            { return proto.CompactTextString(m) }
+func (*StartPublishRequest) ProtoMessage()               {}
+func (*StartPublishRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{5} }
+
+func (m *StartPublishRequest) GetTopic() string {
 	if m != nil {
 		return m.Topic
 	}
@@ -153,10 +172,11 @@ func (m *Config) GetTopic() string {
 
 func init() {
 	proto.RegisterType((*Message)(nil), "pubsub.Message")
-	proto.RegisterType((*Request)(nil), "pubsub.Request")
-	proto.RegisterType((*StartRequest)(nil), "pubsub.StartRequest")
+	proto.RegisterType((*ConsumerRequest)(nil), "pubsub.ConsumerRequest")
+	proto.RegisterType((*StartConsumeRequest)(nil), "pubsub.StartConsumeRequest")
 	proto.RegisterType((*Confirmation)(nil), "pubsub.Confirmation")
-	proto.RegisterType((*Config)(nil), "pubsub.Config")
+	proto.RegisterType((*PublisherRequest)(nil), "pubsub.PublisherRequest")
+	proto.RegisterType((*StartPublishRequest)(nil), "pubsub.StartPublishRequest")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -191,7 +211,7 @@ func (c *messageSourceClient) Consume(ctx context.Context, opts ...grpc.CallOpti
 }
 
 type MessageSource_ConsumeClient interface {
-	Send(*Request) error
+	Send(*ConsumerRequest) error
 	Recv() (*Message, error)
 	grpc.ClientStream
 }
@@ -200,7 +220,7 @@ type messageSourceConsumeClient struct {
 	grpc.ClientStream
 }
 
-func (x *messageSourceConsumeClient) Send(m *Request) error {
+func (x *messageSourceConsumeClient) Send(m *ConsumerRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
@@ -228,7 +248,7 @@ func _MessageSource_Consume_Handler(srv interface{}, stream grpc.ServerStream) e
 
 type MessageSource_ConsumeServer interface {
 	Send(*Message) error
-	Recv() (*Request, error)
+	Recv() (*ConsumerRequest, error)
 	grpc.ServerStream
 }
 
@@ -240,8 +260,8 @@ func (x *messageSourceConsumeServer) Send(m *Message) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *messageSourceConsumeServer) Recv() (*Request, error) {
-	m := new(Request)
+func (x *messageSourceConsumeServer) Recv() (*ConsumerRequest, error) {
+	m := new(ConsumerRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -263,25 +283,125 @@ var _MessageSource_serviceDesc = grpc.ServiceDesc{
 	Metadata: "proximo.proto",
 }
 
+// Client API for MessageSink service
+
+type MessageSinkClient interface {
+	Publish(ctx context.Context, opts ...grpc.CallOption) (MessageSink_PublishClient, error)
+}
+
+type messageSinkClient struct {
+	cc *grpc.ClientConn
+}
+
+func NewMessageSinkClient(cc *grpc.ClientConn) MessageSinkClient {
+	return &messageSinkClient{cc}
+}
+
+func (c *messageSinkClient) Publish(ctx context.Context, opts ...grpc.CallOption) (MessageSink_PublishClient, error) {
+	stream, err := grpc.NewClientStream(ctx, &_MessageSink_serviceDesc.Streams[0], c.cc, "/pubsub.MessageSink/Publish", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &messageSinkPublishClient{stream}
+	return x, nil
+}
+
+type MessageSink_PublishClient interface {
+	Send(*PublisherRequest) error
+	Recv() (*Confirmation, error)
+	grpc.ClientStream
+}
+
+type messageSinkPublishClient struct {
+	grpc.ClientStream
+}
+
+func (x *messageSinkPublishClient) Send(m *PublisherRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *messageSinkPublishClient) Recv() (*Confirmation, error) {
+	m := new(Confirmation)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// Server API for MessageSink service
+
+type MessageSinkServer interface {
+	Publish(MessageSink_PublishServer) error
+}
+
+func RegisterMessageSinkServer(s *grpc.Server, srv MessageSinkServer) {
+	s.RegisterService(&_MessageSink_serviceDesc, srv)
+}
+
+func _MessageSink_Publish_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(MessageSinkServer).Publish(&messageSinkPublishServer{stream})
+}
+
+type MessageSink_PublishServer interface {
+	Send(*Confirmation) error
+	Recv() (*PublisherRequest, error)
+	grpc.ServerStream
+}
+
+type messageSinkPublishServer struct {
+	grpc.ServerStream
+}
+
+func (x *messageSinkPublishServer) Send(m *Confirmation) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *messageSinkPublishServer) Recv() (*PublisherRequest, error) {
+	m := new(PublisherRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+var _MessageSink_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "pubsub.MessageSink",
+	HandlerType: (*MessageSinkServer)(nil),
+	Methods:     []grpc.MethodDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "Publish",
+			Handler:       _MessageSink_Publish_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
+	Metadata: "proximo.proto",
+}
+
 func init() { proto.RegisterFile("proximo.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 259 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x54, 0x91, 0x3f, 0x4f, 0xc3, 0x30,
-	0x10, 0xc5, 0x71, 0x80, 0x84, 0x1e, 0x29, 0x48, 0x56, 0x87, 0xa8, 0x53, 0x65, 0x31, 0x64, 0x21,
-	0x82, 0xb2, 0x20, 0x26, 0x44, 0x59, 0x18, 0x58, 0xdc, 0x4f, 0x90, 0x3f, 0x26, 0xf2, 0x90, 0x5c,
-	0xf0, 0x1f, 0x89, 0x85, 0xef, 0x8e, 0xea, 0xb8, 0xc5, 0xde, 0xfc, 0x7c, 0xef, 0xfd, 0xee, 0xce,
-	0x86, 0xe5, 0xa4, 0xf0, 0x47, 0x0e, 0x58, 0x4d, 0x0a, 0x0d, 0xd2, 0x74, 0xb2, 0x8d, 0xb6, 0x0d,
-	0xbb, 0x87, 0xec, 0x53, 0x68, 0x5d, 0xf7, 0x82, 0x52, 0xb8, 0xe8, 0x6a, 0x53, 0x17, 0x64, 0x43,
-	0xca, 0x9c, 0xbb, 0x33, 0xbd, 0x81, 0x44, 0x76, 0x45, 0xb2, 0x21, 0xe5, 0x82, 0x27, 0xb2, 0x63,
-	0xbf, 0x90, 0x71, 0xf1, 0x6d, 0x85, 0x36, 0xf4, 0x19, 0x72, 0x6d, 0x6a, 0x65, 0xbc, 0x76, 0xa6,
-	0xeb, 0xed, 0xaa, 0x9a, 0xc1, 0xd5, 0x3e, 0xa8, 0xf1, 0xc8, 0x79, 0x48, 0xb6, 0x38, 0x7e, 0x49,
-	0x35, 0xd4, 0x46, 0xe2, 0x58, 0x9c, 0xc7, 0xc9, 0x5d, 0x50, 0xe3, 0x91, 0x93, 0xbd, 0x42, 0x1e,
-	0x72, 0xe9, 0x0a, 0x2e, 0x0d, 0x4e, 0xb2, 0x75, 0x33, 0x2f, 0xf8, 0x2c, 0xe8, 0x1a, 0xae, 0x5a,
-	0x1c, 0xb5, 0x1d, 0x84, 0xf2, 0xa3, 0x9f, 0x34, 0xbb, 0x83, 0x3c, 0xe4, 0x1f, 0x08, 0x83, 0xee,
-	0x3f, 0xde, 0x8f, 0x04, 0x27, 0xd8, 0x0b, 0xa4, 0xce, 0xd5, 0x47, 0x2c, 0x12, 0xb3, 0xfe, 0xbb,
-	0x27, 0x41, 0xf7, 0xed, 0x1b, 0x2c, 0xfd, 0x8b, 0xee, 0xd1, 0xaa, 0x56, 0xd0, 0x47, 0xc8, 0x76,
-	0x73, 0x84, 0xde, 0x1e, 0x77, 0xf4, 0x0b, 0xac, 0x4f, 0x17, 0x3e, 0xc2, 0xce, 0x4a, 0xf2, 0x40,
-	0x9a, 0xd4, 0x7d, 0xd2, 0xd3, 0x5f, 0x00, 0x00, 0x00, 0xff, 0xff, 0xdd, 0xbd, 0x35, 0xcf, 0xb5,
-	0x01, 0x00, 0x00,
+	// 321 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x94, 0x92, 0x4f, 0x4f, 0xf2, 0x40,
+	0x10, 0xc6, 0xdf, 0xc2, 0x2b, 0xc8, 0x50, 0xc4, 0x8c, 0x24, 0x36, 0x78, 0xc1, 0x8d, 0x07, 0x12,
+	0x23, 0x31, 0x78, 0xd1, 0x13, 0x07, 0x4c, 0x8c, 0x26, 0x1a, 0xb3, 0x7c, 0x82, 0xb6, 0xac, 0xb8,
+	0xd1, 0x76, 0xeb, 0xfe, 0x31, 0x7e, 0x08, 0x3f, 0xb4, 0x61, 0x99, 0x9a, 0x42, 0x7a, 0xf1, 0xd6,
+	0x27, 0x33, 0xcf, 0x6f, 0xf6, 0x99, 0x29, 0xf4, 0x0a, 0xad, 0xbe, 0x64, 0xa6, 0x26, 0x85, 0x56,
+	0x56, 0x61, 0xab, 0x70, 0x89, 0x71, 0x09, 0xbb, 0x80, 0xf6, 0xa3, 0x30, 0x26, 0x5e, 0x09, 0x44,
+	0xf8, 0xbf, 0x8c, 0x6d, 0x1c, 0x05, 0xa3, 0x60, 0x1c, 0x72, 0xff, 0x8d, 0x07, 0xd0, 0x90, 0xcb,
+	0xa8, 0x31, 0x0a, 0xc6, 0x1d, 0xde, 0x90, 0x4b, 0xf6, 0x1d, 0x40, 0x7f, 0xae, 0x72, 0xe3, 0x32,
+	0xa1, 0xb9, 0xf8, 0x70, 0xc2, 0x58, 0x9c, 0x41, 0x68, 0x6c, 0xac, 0x2d, 0x69, 0xdf, 0xdd, 0x9d,
+	0x9e, 0x4c, 0x36, 0x13, 0x26, 0x8b, 0x75, 0x8d, 0x3c, 0xd4, 0xc2, 0xb7, 0x0c, 0x78, 0x0d, 0x61,
+	0xaa, 0xf2, 0x17, 0xa9, 0xb3, 0xd8, 0x4a, 0x95, 0x47, 0x4d, 0x0f, 0x18, 0x94, 0x80, 0x79, 0xa5,
+	0xc6, 0xb7, 0x3a, 0xd9, 0x1d, 0x1c, 0xd5, 0xe0, 0x71, 0x00, 0x7b, 0x56, 0x15, 0x32, 0xf5, 0x51,
+	0x3a, 0x7c, 0x23, 0x70, 0x08, 0xfb, 0x29, 0x3d, 0x9d, 0x12, 0xfd, 0x6a, 0x76, 0x06, 0x61, 0x75,
+	0xcc, 0x9a, 0x90, 0x99, 0xd5, 0xfd, 0x6d, 0x49, 0xf0, 0x82, 0x7d, 0xc2, 0xe1, 0xb3, 0x4b, 0xde,
+	0xa5, 0x79, 0xfd, 0x5b, 0x7a, 0x32, 0xd5, 0xa7, 0x3f, 0x85, 0x66, 0x66, 0x56, 0x14, 0xba, 0x5f,
+	0xfa, 0xe8, 0x28, 0x7c, 0x5d, 0x63, 0xe7, 0x14, 0x73, 0x9b, 0x53, 0x1f, 0x73, 0xfa, 0x00, 0x3d,
+	0x32, 0x2f, 0x94, 0xd3, 0xa9, 0xc0, 0x1b, 0x68, 0xd3, 0x7e, 0xf0, 0xb8, 0xb2, 0xd3, 0xea, 0x0d,
+	0x87, 0xbb, 0x73, 0xd9, 0xbf, 0x71, 0x70, 0x19, 0x4c, 0x9f, 0xa0, 0x5b, 0xb2, 0x64, 0xfe, 0x86,
+	0x33, 0x68, 0xd3, 0x13, 0x30, 0x2a, 0x0d, 0xbb, 0x0b, 0x19, 0xd6, 0xde, 0x6d, 0xc3, 0x4b, 0x5a,
+	0xfe, 0xe7, 0xbb, 0xfa, 0x09, 0x00, 0x00, 0xff, 0xff, 0x32, 0xd8, 0x68, 0x0a, 0x8d, 0x02, 0x00,
+	0x00,
 }
