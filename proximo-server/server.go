@@ -81,13 +81,20 @@ func (s *server) Consume(stream proximo.MessageSource_ConsumeServer) error {
 	}
 
 	forClient := make(chan *proximo.Message)
-	defer close(forClient)
 
 	go func() {
-		for m := range forClient {
-			err := stream.Send(m)
-			if err != nil {
-				errors <- err
+		for {
+			select {
+			case m := <-forClient:
+				err := stream.Send(m)
+				if err != nil {
+					if strings.HasSuffix(err.Error(), "context canceled") {
+						return
+					}
+					errors <- err
+					return
+				}
+			case <-ctx.Done():
 				return
 			}
 		}
