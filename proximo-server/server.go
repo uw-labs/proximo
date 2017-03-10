@@ -16,13 +16,13 @@ var (
 	errInvalidRequest = errors.New("invalid consumer request - this is possibly a bug in your client library")
 )
 
-type Handler interface {
+type handler interface {
 	HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *proximo.Message, confirmRequest <-chan *proximo.Confirmation) error
 	HandleProduce(ctx context.Context, topic string, forClient chan<- *proximo.Confirmation, messages <-chan *proximo.Message) error
 }
 
 type server struct {
-	handler Handler
+	handler handler
 }
 
 func (s *server) Consume(stream proximo.MessageSource_ConsumeServer) error {

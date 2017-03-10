@@ -12,8 +12,8 @@ type amqpHandler struct {
 	address string
 }
 
-func (mq *amqpHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *proximo.Message, confirmRequest <-chan *proximo.Confirmation) error {
-	conn, err := amqp.Dial(mq.address)
+func (h *amqpHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *proximo.Message, confirmRequest <-chan *proximo.Confirmation) error {
+	conn, err := amqp.Dial(h.address)
 	if err != nil {
 		return err
 	}

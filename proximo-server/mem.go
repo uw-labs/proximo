@@ -44,7 +44,7 @@ func (h *memHandler) HandleProduce(ctx context.Context, topic string, forClient 
 			select {
 			case h.incomingMessages <- &produceReq{topic, msg}:
 				select {
-				case forClient <- &proximo.Confirmation{msg.GetId()}:
+				case forClient <- &proximo.Confirmation{MsgID: msg.GetId()}:
 				case <-ctx.Done():
 					return nil
 				}
@@ -81,7 +81,7 @@ func (h memHandler) loop() {
 						select {
 						case <-sub.ctx.Done():
 							// drop expired consumers
-						case sub.msgs <- &proximo.Message{inm.message.GetData(), makeId()}:
+						case sub.msgs <- &proximo.Message{inm.message.GetData(), makeID()}:
 							remaining = append(remaining, sub)
 							sentOne = true
 						}
@@ -106,7 +106,7 @@ type sub struct {
 	ctx      context.Context
 }
 
-func makeId() string {
+func makeID() string {
 	random := []byte{0, 0, 0, 0, 0, 0, 0, 0}
 	_, err := rand.Read(random)
 	if err != nil {

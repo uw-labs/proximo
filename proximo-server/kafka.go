@@ -130,11 +130,9 @@ func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClien
 			if err != nil {
 				return err
 			}
-			forClient <- &proximo.Confirmation{m.GetId()}
+			forClient <- &proximo.Confirmation{MsgID: m.GetId()}
 		case <-ctx.Done():
 			return nil
 		}
 	}
-
-	return sp.Close()
 }
