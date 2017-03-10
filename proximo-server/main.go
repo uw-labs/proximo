@@ -73,5 +73,21 @@ func main() {
 		}
 	})
 
+	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
+		cmd.Action = func() {
+
+			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+			if err != nil {
+				grpclog.Fatalf("failed to listen: %v", err)
+			}
+			var opts []grpc.ServerOption
+			grpcServer := grpc.NewServer(opts...)
+			kh := newMemHandler()
+			proximo.RegisterMessageSourceServer(grpcServer, &server{kh})
+			proximo.RegisterMessageSinkServer(grpcServer, &server{kh})
+			grpclog.Fatal(grpcServer.Serve(lis))
+		}
+	})
+
 	grpclog.Fatal(app.Run(os.Args))
 }
