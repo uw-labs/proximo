@@ -5,12 +5,6 @@ It is an RPC based API definition, a collection of client libraries, and a serve
 
 Currently under heavy development.
 
-Supported backends
-
-* Apache Kafka
-* RabbitMQ (consume only currently)
-* In memory (non-durable for testing purposes)
-
 [protobuf definitions](proto/)
 
 [proximo server](proximo-server/README.md)
