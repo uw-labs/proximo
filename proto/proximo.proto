@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package pubsub;
+package proximo;
 
 message Message {
   bytes data = 1;
