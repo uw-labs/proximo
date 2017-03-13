@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package proximo;
+
+message Message {
+  bytes data = 1;
+  string id = 2;
+}
+
+// Consumer types
+service MessageSource {
+	rpc Consume(stream ConsumerRequest) returns (stream Message) {}
+}
+
+message ConsumerRequest {
+  // expected if this is a start request
+  StartConsumeRequest startRequest = 2;
+  // expected if this is a confirmation
+  Confirmation confirmation = 3;
+}
+
+message StartConsumeRequest {
+  string topic = 1;
+  string consumer = 2;
+}
+
+message Confirmation {
+  string msgID = 1;
+}
+
+// Producer types
+service MessageSink {
+	rpc Publish(stream PublisherRequest) returns (stream Confirmation) {}
+}
+
+message PublisherRequest {
+  // expected if this is a start request
+  StartPublishRequest startRequest = 2;
+  // expected if this is a message
+  Message msg = 3;
+}
+
+message StartPublishRequest {
+  string topic = 1;
+}
