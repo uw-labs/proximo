@@ -9,7 +9,6 @@ import (
 
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
-	"github.com/utilitywarehouse/proximo/go-proximo"
 	"google.golang.org/grpc/grpclog"
 )
 
@@ -17,7 +16,7 @@ type kafkaHandler struct {
 	brokers []string
 }
 
-func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *proximo.Message, confirmRequest <-chan *proximo.Confirmation) error {
+func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
 	toConfirmIds := make(chan string)
 
 	errors := make(chan error)
@@ -59,7 +58,7 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string
 	}
 }
 
-func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClient chan<- *proximo.Message, toConfirmID chan string, topic, consumer string) error {
+func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClient chan<- *Message, toConfirmID chan string, topic, consumer string) error {
 
 	grpclog.Println("started consume loop")
 	defer grpclog.Println("exited consume loop")
@@ -69,7 +68,7 @@ func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClie
 		case msg := <-c.Messages():
 			confirmID := fmt.Sprintf("%d-%d", msg.Offset, msg.Partition)
 			select {
-			case forClient <- &proximo.Message{Data: msg.Value, Id: confirmID}:
+			case forClient <- &Message{Data: msg.Value, Id: confirmID}:
 			case <-ctx.Done():
 				return c.Close()
 			}
@@ -107,7 +106,7 @@ func (h *kafkaHandler) confirm(ctx context.Context, c *cluster.Consumer, id stri
 	return nil
 }
 
-func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *proximo.Confirmation, messages <-chan *proximo.Message) error {
+func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
 	conf := sarama.NewConfig()
 	conf.Producer.Return.Successes = true
 
@@ -130,7 +129,7 @@ func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClien
 			if err != nil {
 				return err
 			}
-			forClient <- &proximo.Confirmation{MsgID: m.GetId()}
+			forClient <- &Confirmation{MsgID: m.GetId()}
 		case <-ctx.Done():
 			return nil
 		}

@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-
-	"github.com/utilitywarehouse/proximo/go-proximo"
 )
 
 func newMemHandler() *memHandler {
@@ -19,7 +17,7 @@ type memHandler struct {
 	subs             chan *sub
 }
 
-func (h *memHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *proximo.Message, confirmRequest <-chan *proximo.Confirmation) error {
+func (h *memHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -35,7 +33,7 @@ func (h *memHandler) HandleConsume(ctx context.Context, consumer, topic string, 
 	}
 }
 
-func (h *memHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *proximo.Confirmation, messages <-chan *proximo.Message) error {
+func (h *memHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -44,7 +42,7 @@ func (h *memHandler) HandleProduce(ctx context.Context, topic string, forClient 
 			select {
 			case h.incomingMessages <- &produceReq{topic, msg}:
 				select {
-				case forClient <- &proximo.Confirmation{MsgID: msg.GetId()}:
+				case forClient <- &Confirmation{MsgID: msg.GetId()}:
 				case <-ctx.Done():
 					return nil
 				}
@@ -81,7 +79,7 @@ func (h memHandler) loop() {
 						select {
 						case <-sub.ctx.Done():
 							// drop expired consumers
-						case sub.msgs <- &proximo.Message{inm.message.GetData(), makeID()}:
+						case sub.msgs <- &Message{inm.message.GetData(), makeID()}:
 							remaining = append(remaining, sub)
 							sentOne = true
 						}
@@ -96,13 +94,13 @@ func (h memHandler) loop() {
 
 type produceReq struct {
 	topic   string
-	message *proximo.Message
+	message *Message
 }
 
 type sub struct {
 	topic    string
 	consumer string
-	msgs     chan<- *proximo.Message
+	msgs     chan<- *Message
 	ctx      context.Context
 }
 

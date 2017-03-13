@@ -5,8 +5,6 @@ import (
 	"errors"
 	"io"
 	"strings"
-
-	"github.com/utilitywarehouse/proximo/go-proximo"
 )
 
 var (
@@ -17,21 +15,21 @@ var (
 )
 
 type handler interface {
-	HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *proximo.Message, confirmRequest <-chan *proximo.Confirmation) error
-	HandleProduce(ctx context.Context, topic string, forClient chan<- *proximo.Confirmation, messages <-chan *proximo.Message) error
+	HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error
+	HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error
 }
 
 type server struct {
 	handler handler
 }
 
-func (s *server) Consume(stream proximo.MessageSource_ConsumeServer) error {
+func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
-	startRequest := make(chan *proximo.StartConsumeRequest)
-	confirmRequest := make(chan *proximo.Confirmation)
+	startRequest := make(chan *StartConsumeRequest)
+	confirmRequest := make(chan *Confirmation)
 	errors := make(chan error, 3)
 
 	go func() {
@@ -80,7 +78,7 @@ func (s *server) Consume(stream proximo.MessageSource_ConsumeServer) error {
 		return nil //ctx.Err()
 	}
 
-	forClient := make(chan *proximo.Message)
+	forClient := make(chan *Message)
 
 	go func() {
 		for {
@@ -116,13 +114,13 @@ func (s *server) Consume(stream proximo.MessageSource_ConsumeServer) error {
 
 }
 
-func (s *server) Publish(stream proximo.MessageSink_PublishServer) error {
+func (s *server) Publish(stream MessageSink_PublishServer) error {
 
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
-	startRequest := make(chan *proximo.StartPublishRequest)
-	messages := make(chan *proximo.Message)
+	startRequest := make(chan *StartPublishRequest)
+	messages := make(chan *Message)
 	errors := make(chan error, 3)
 
 	go func() {
@@ -166,7 +164,7 @@ func (s *server) Publish(stream proximo.MessageSink_PublishServer) error {
 		return nil //ctx.Err()
 	}
 
-	forClient := make(chan *proximo.Confirmation)
+	forClient := make(chan *Confirmation)
 	defer close(forClient)
 
 	go func() {

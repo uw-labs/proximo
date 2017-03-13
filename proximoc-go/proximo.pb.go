@@ -3,7 +3,7 @@
 // DO NOT EDIT!
 
 /*
-Package proximo is a generated protocol buffer package.
+Package proximoc is a generated protocol buffer package.
 
 It is generated from these files:
 	proximo.proto
@@ -16,7 +16,7 @@ It has these top-level messages:
 	PublisherRequest
 	StartPublishRequest
 */
-package proximo
+package proximoc
 
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/jawher/mow.cli"
-	"github.com/utilitywarehouse/proximo/go-proximo"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 )
@@ -42,8 +41,8 @@ func main() {
 				brokers: brokers,
 			}
 			grpclog.Printf("%#v\n", brokers)
-			proximo.RegisterMessageSourceServer(grpcServer, &server{kh})
-			proximo.RegisterMessageSinkServer(grpcServer, &server{kh})
+			RegisterMessageSourceServer(grpcServer, &server{kh})
+			RegisterMessageSinkServer(grpcServer, &server{kh})
 			grpclog.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -67,8 +66,8 @@ func main() {
 				address: *address,
 			}
 			grpclog.Printf("%#v\n", address)
-			proximo.RegisterMessageSourceServer(grpcServer, &server{kh})
-			proximo.RegisterMessageSinkServer(grpcServer, &server{kh})
+			RegisterMessageSourceServer(grpcServer, &server{kh})
+			RegisterMessageSinkServer(grpcServer, &server{kh})
 			grpclog.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -83,8 +82,8 @@ func main() {
 			var opts []grpc.ServerOption
 			grpcServer := grpc.NewServer(opts...)
 			kh := newMemHandler()
-			proximo.RegisterMessageSourceServer(grpcServer, &server{kh})
-			proximo.RegisterMessageSinkServer(grpcServer, &server{kh})
+			RegisterMessageSourceServer(grpcServer, &server{kh})
+			RegisterMessageSinkServer(grpcServer, &server{kh})
 			grpclog.Fatal(grpcServer.Serve(lis))
 		}
 	})
