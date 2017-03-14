@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
 
 	"github.com/jawher/mow.cli"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/grpclog"
 )
 
 func main() {
@@ -33,17 +33,17 @@ func main() {
 
 			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 			if err != nil {
-				grpclog.Fatalf("failed to listen: %v", err)
+				log.Fatalf("failed to listen: %v", err)
 			}
 			var opts []grpc.ServerOption
 			grpcServer := grpc.NewServer(opts...)
 			kh := &kafkaHandler{
 				brokers: brokers,
 			}
-			grpclog.Printf("%#v\n", brokers)
+			log.Printf("%#v\n", brokers)
 			RegisterMessageSourceServer(grpcServer, &server{kh})
 			RegisterMessageSinkServer(grpcServer, &server{kh})
-			grpclog.Fatal(grpcServer.Serve(lis))
+			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
 
@@ -58,17 +58,17 @@ func main() {
 
 			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 			if err != nil {
-				grpclog.Fatalf("failed to listen: %v", err)
+				log.Fatalf("failed to listen: %v", err)
 			}
 			var opts []grpc.ServerOption
 			grpcServer := grpc.NewServer(opts...)
 			kh := &amqpHandler{
 				address: *address,
 			}
-			grpclog.Printf("%#v\n", address)
+			log.Printf("%#v\n", address)
 			RegisterMessageSourceServer(grpcServer, &server{kh})
 			RegisterMessageSinkServer(grpcServer, &server{kh})
-			grpclog.Fatal(grpcServer.Serve(lis))
+			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
 
@@ -77,16 +77,16 @@ func main() {
 
 			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 			if err != nil {
-				grpclog.Fatalf("failed to listen: %v", err)
+				log.Fatalf("failed to listen: %v", err)
 			}
 			var opts []grpc.ServerOption
 			grpcServer := grpc.NewServer(opts...)
 			kh := newMemHandler()
 			RegisterMessageSourceServer(grpcServer, &server{kh})
 			RegisterMessageSinkServer(grpcServer, &server{kh})
-			grpclog.Fatal(grpcServer.Serve(lis))
+			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
 
-	grpclog.Fatal(app.Run(os.Args))
+	log.Fatal(app.Run(os.Args))
 }
