@@ -40,7 +40,7 @@ func main() {
 			kh := &kafkaHandler{
 				brokers: brokers,
 			}
-			log.Printf("%#v\n", brokers)
+			log.Printf("Using kafka at %s\n", brokers)
 			RegisterMessageSourceServer(grpcServer, &server{kh})
 			RegisterMessageSinkServer(grpcServer, &server{kh})
 			log.Fatal(grpcServer.Serve(lis))
@@ -65,7 +65,7 @@ func main() {
 			kh := &amqpHandler{
 				address: *address,
 			}
-			log.Printf("%#v\n", address)
+			log.Printf("Using AMQP at %s\n", *address)
 			RegisterMessageSourceServer(grpcServer, &server{kh})
 			RegisterMessageSinkServer(grpcServer, &server{kh})
 			log.Fatal(grpcServer.Serve(lis))
@@ -82,6 +82,7 @@ func main() {
 			var opts []grpc.ServerOption
 			grpcServer := grpc.NewServer(opts...)
 			kh := newMemHandler()
+			log.Printf("Using in memory testing backend")
 			RegisterMessageSourceServer(grpcServer, &server{kh})
 			RegisterMessageSinkServer(grpcServer, &server{kh})
 			log.Fatal(grpcServer.Serve(lis))
