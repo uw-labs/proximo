@@ -106,7 +106,7 @@ func main() {
 
 	app.Command("nats", "Use NATS backend", func(cmd *cli.Cmd) {
 		url := cmd.String(cli.StringOpt{
-			Name:   "utl",
+			Name:   "url",
 			Value:  "nats://localhost:4222",
 			Desc:   "NATS url",
 			EnvVar: "PROXIMO_NATS_URL",
