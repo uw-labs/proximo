@@ -1,5 +1,5 @@
 # Proximo
-Proximo is an proxy for multiple different publish-subscribe queuing systems.
+Proximo is a proxy for multiple different publish-subscribe queuing systems.
 
 It is based on a GRPC interface definition, making it easy to create new client libraries.
 It already supports a number of popular queueing systems, and adding new ones is intended to be simple.
@@ -16,7 +16,7 @@ Exposing specific details of the underlying queue system via the client API
 
 ## Server
 
-This is the Proxcimo server implementation, written in Go
+This is the Proximo server implementation, written in Go
 
 [proximo server](proximo-server/README.md)
 
