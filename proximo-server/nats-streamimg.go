@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -37,10 +38,10 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 				case cr := <-confirmRequest:
 					seq, err := strconv.ParseUint(cr.MsgID, 10, 64)
 					if err != nil {
-						panic("handle this")
+						panic(fmt.Sprintf("failed to parse message sequence '%v' TODO: change this from a panic", cr.MsgID))
 					}
 					if seq != msg.Sequence {
-						panic("handle this")
+						panic(fmt.Sprintf("unexpected message sequence. was %v but wanted %v. TODO: change this from a panic", seq, msg.Sequence))
 					}
 					msg.Ack()
 				case <-ctx.Done():
