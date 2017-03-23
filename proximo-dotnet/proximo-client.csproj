@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+ 
+  <PropertyGroup>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <TargetFramework>netstandard1.6</TargetFramework>
+    <AssemblyName>proximo-dotnet</AssemblyName>
+    <PackageId>proximo-dotnet</PackageId>
+    <PackageTargetFallback>$(PackageTargetFallback);dnxcore50</PackageTargetFallback>
+    <ApplicationIcon />
+    <StartupObject />
+    <RootNamespace>proximo_dotnet</RootNamespace>
+  </PropertyGroup>
+ 
+  <ItemGroup>
+    <Compile Remove="Consumer\**" />
+    <Compile Remove="Producer\**" />
+    <EmbeddedResource Remove="Consumer\**" />
+    <EmbeddedResource Remove="Producer\**" />
+    <None Remove="Consumer\**" />
+    <None Remove="Producer\**" />
+  </ItemGroup>
+ 
+  <ItemGroup>
+    <None Remove=".gitignore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.2.0" />
+    <PackageReference Include="Google.Protobuf.Tools" Version="3.2.0" />
+    <PackageReference Include="Grpc.Core" Version="1.2.0-pre1" />
+    <PackageReference Include="Grpc.Tools" Version="1.2.0-pre1" />
+    <PackageReference Include="System.ValueTuple" Version="4.3.0" />
+  </ItemGroup>
+</Project>
