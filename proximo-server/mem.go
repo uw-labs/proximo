@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 )
 
 func newMemHandler() *memHandler {
@@ -102,13 +100,4 @@ type sub struct {
 	consumer string
 	msgs     chan<- *Message
 	ctx      context.Context
-}
-
-func makeID() string {
-	random := []byte{0, 0, 0, 0, 0, 0, 0, 0}
-	_, err := rand.Read(random)
-	if err != nil {
-		panic(err)
-	}
-	return base64.URLEncoding.EncodeToString(random)
 }
