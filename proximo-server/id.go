@@ -2,7 +2,7 @@ package main
 
 import (
 	"crypto/rand"
-	"encoding/base64"
+	"encoding/hex"
 )
 
 func generateID() string {
@@ -11,5 +11,5 @@ func generateID() string {
 	if err != nil {
 		panic(err)
 	}
-	return base64.URLEncoding.EncodeToString(random)
+	return hex.EncodeToString(random)
 }
