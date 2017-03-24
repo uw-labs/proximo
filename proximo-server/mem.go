@@ -77,7 +77,7 @@ func (h memHandler) loop() {
 						select {
 						case <-sub.ctx.Done():
 							// drop expired consumers
-						case sub.msgs <- &Message{inm.message.GetData(), makeID()}:
+						case sub.msgs <- &Message{inm.message.GetData(), generateID()}:
 							remaining = append(remaining, sub)
 							sentOne = true
 						}

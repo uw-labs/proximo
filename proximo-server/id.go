@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 )
 
-func makeID() string {
+func generateID() string {
 	random := []byte{0, 0, 0, 0, 0, 0, 0, 0}
 	_, err := rand.Read(random)
 	if err != nil {
