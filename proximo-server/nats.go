@@ -31,7 +31,7 @@ func (h *natsHandler) HandleConsume(ctx context.Context, consumer, topic string,
 		case m := <-ch:
 			forClient <- &Message{
 				Data: m.Data,
-				Id:   makeID(),
+				Id:   generateID(),
 			}
 		case <-ctx.Done():
 			return sub.Unsubscribe()

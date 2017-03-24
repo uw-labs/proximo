@@ -18,7 +18,7 @@ type natsStreamingHandler struct {
 
 func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
 
-	conn, err := stan.Connect(h.clusterID, consumer, stan.NatsURL(h.url))
+	conn, err := stan.Connect(h.clusterID, consumer+generateID(), stan.NatsURL(h.url))
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 
 func (h *natsStreamingHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
 
-	conn, err := stan.Connect(h.clusterID, "hardcoded-fixme", stan.NatsURL(h.url))
+	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsURL(h.url))
 	if err != nil {
 		return err
 	}
