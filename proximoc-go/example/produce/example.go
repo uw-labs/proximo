@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"log"
+	//"math/rand" 
+	"time"
 
 	proximoc "github.com/utilitywarehouse/proximo/proximoc-go"
 )
@@ -17,9 +19,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = c.Produce([]byte("hello world"))
-	if err != nil {
-		log.Fatal(err)
+	start := time.Now()
+	for index := 0; index < 100; index++ {
+		payload := make([]byte, 1000)
+		//rand.Read(payload)
+
+		err = c.Produce(payload)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		//fmt.Println(len(payload))
 	}
 
 	err = c.Close()
@@ -27,4 +37,6 @@ func main() {
 		log.Fatal(err)
 	}
 
+	elapsed := time.Since(start)
+    log.Printf("Publishing 100 messages in %s", elapsed)
 }

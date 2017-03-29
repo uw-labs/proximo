@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/utilitywarehouse/proximo/proximoc-go"
 )
 
 func main() {
-	id :=time.Now()
-	clientId := "example-client-"+ id.Format("20060102150405")
+	clientId := "dotnetc-client"
 	
 	if err := proximoc.ConsumeContext(
 		context.Background(),

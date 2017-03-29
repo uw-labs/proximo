@@ -27,8 +27,10 @@ namespace proximo_dotnet
         }
 
         /// <summary>
-        /// Consuming messages
+        /// Consume messages from proximo server and adds them to an in-memory queue
         /// </summary>
+        /// <param name="messagesQueue">The in-memory queue.</param>
+        /// /// <param name="cancellationToken">The cancellation token.</param>
         public async Task ConsumeMessages(Queue<(string, string)> messagesQueue, CancellationToken cancellationToken)
         {
             var confirmations = new Queue<Message>();
@@ -116,17 +118,31 @@ namespace proximo_dotnet
         }
 
         /// <summary>
-        /// Bi-directional publishing of messages 
+        /// Publish messages to proximo server and adds the confirmation ids to an in-memory queue
         /// </summary>
-        public async Task PublishMessages(List<(string, string)> messagesList, Queue<string> receiveQueue)
+        /// <param name="messagesList">A list of string messages</param>
+        /// <param name="receiveQueue">The in-memory queue.</param>
+        public async Task PublishMessages((string, string) message, Queue<string> receiveQueue)
+        {
+            (string, byte[]) converted = (message.Item1, Encoding.UTF8.GetBytes(message.Item2));
+
+            await PublishMessages(converted, receiveQueue);
+        }
+
+        /// <summary>
+        /// Publish messages to proximo server and adds the confirmation ids to an in-memory queue
+        /// </summary>
+        /// <param name="messagesList">A list of byte[] messages</param>
+        /// <param name="receiveQueue">The in-memory queue.</param>
+        public async Task PublishMessages((string, byte[]) message, Queue<string> receiveQueue)
         {
             try
             {
-                var requests = messagesList.Select(m=> new Proximo.Message
-                    {
-                        Id = m.Item1,
-                        Data = ByteString.CopyFromUtf8(m.Item2)
-                });
+                var request = new Proximo.Message
+                {
+                    Id = message.Item1,
+                    Data = ByteString.CopyFrom(message.Item2)
+                };
 
                 using (var call = _client.Publish(new CallOptions { }))
                 {
@@ -138,36 +154,35 @@ namespace proximo_dotnet
                             {
                                 var confirm = call.ResponseStream.Current;
                                 receiveQueue.Enqueue(confirm.MsgID);
+                                break;
                             }
                         }
                         catch (Exception e)
                         {
                             throw e;
                         }
-                       
+
                     });
 
                     var spr = new PublisherRequest
                     {
-                        StartRequest = new StartPublishRequest { Topic = _topic}
+                        StartRequest = new StartPublishRequest { Topic = _topic }
                     };
                     await call.RequestStream.WriteAsync(spr);
 
-                    foreach (Message request in requests)
-                    {
-                        var pr = new PublisherRequest
-                        {
-                            Msg = request
-                        };
 
-                        try
-                        {
-                            await call.RequestStream.WriteAsync(pr);
-                        }
-                        catch (Exception e)
-                        {
-                            throw e;
-                        }
+                    var pr = new PublisherRequest
+                    {
+                        Msg = request
+                    };
+
+                    try
+                    {
+                        await call.RequestStream.WriteAsync(pr);
+                    }
+                    catch (Exception e)
+                    {
+                        throw e;
                     }
 
                     await call.RequestStream.CompleteAsync();

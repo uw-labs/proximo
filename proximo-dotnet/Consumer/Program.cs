@@ -23,7 +23,7 @@ namespace proximo_consumer
                     if (messagesQ.Count > 0)
                     {
                         var msg = messagesQ.Dequeue();
-                        Console.WriteLine($"Got a new meesage: {msg.Item2} with id {msg.Item1}");
+                        Console.WriteLine($"Got a new message: '{msg.Item2}' with id '{msg.Item1}'");
                     }
                 }
             });
