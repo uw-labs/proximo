@@ -13,7 +13,7 @@ namespace proximo_consumer
         {
             var channel = new Grpc.Core.Channel("127.0.0.1:6868", ChannelCredentials.Insecure);
             IConsumerClient client = new ConsumerClient(new Proximo.MessageSource.MessageSourceClient(channel), "dotnetc-client", "new-topic");
-            var messagesQ = new Queue<(string, string)>();
+            var messagesQ = new List<(string, string, double)>();
 
             Action useMessagesAction = (() =>
             {
@@ -22,8 +22,8 @@ namespace proximo_consumer
                     Thread.Sleep(500);
                     if (messagesQ.Count > 0)
                     {
-                        var msg = messagesQ.Dequeue();
-                        Console.WriteLine($"Got a new message: '{msg.Item2}' with id '{msg.Item1}'");
+                        var msg = messagesQ;
+                        Console.WriteLine($"Got {messagesQ.Count} messages.'");
                     }
                 }
             });

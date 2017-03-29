@@ -9,8 +9,8 @@ namespace proximo_dotnet
         /// <summary>
         /// Consume messages from proximo server and adds them to an in-memory queue
         /// </summary>
-        /// <param name="messagesQueue">The in-memory queue.</param>
+        /// <param name="messagesQueue">The in-memory queue. (id, message, time spent)</param>
         /// /// <param name="cancellationToken">The cancellation token.</param>
-        Task ConsumeMessages(Queue<(string, string)> messagesQueue, CancellationToken cancellationToken);
+        Task ConsumeMessages(List<(string, string, double)> messagesQueue, CancellationToken cancellationToken);
     }
 }

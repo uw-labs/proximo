@@ -3,6 +3,7 @@ using Grpc.Core;
 using Proximo;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -29,17 +30,19 @@ namespace proximo_dotnet
         /// <summary>
         /// Consume messages from proximo server and adds them to an in-memory queue
         /// </summary>
-        /// <param name="messagesQueue">The in-memory queue.</param>
+        /// <param name="messagesQueue">The in-memory queue. (id, message, time spent)</param>
         /// /// <param name="cancellationToken">The cancellation token.</param>
-        public async Task ConsumeMessages(Queue<(string, string)> messagesQueue, CancellationToken cancellationToken)
+        public async Task ConsumeMessages(List<(string, string, double)> messagesQueue, CancellationToken cancellationToken)
         {
             var confirmations = new Queue<Message>();
             try
             {
                 using (var call = _client.Consume())
                 {
+                    Stopwatch sw = null;
                     Action<Message> consumerRequestAction = (async (Message confMsg) =>
                     {
+                        //Confirmm message was received.
                         var cr = new ConsumerRequest
                         {
                             Confirmation = new Confirmation { MsgID = confMsg.Id }
@@ -62,15 +65,17 @@ namespace proximo_dotnet
                         {
                             while (call.ResponseStream.MoveNext(cancellationToken).Result)
                             {
+                                sw = Stopwatch.StartNew();
+
                                 var confirm = call.ResponseStream.Current;
                                 confirmations.Enqueue(confirm);
                                 var data = confirm.Data.ToString(Encoding.UTF8);
 
-                                //add to local queue
-                                messagesQueue.Enqueue((confirm.Id, data));
-
                                 var consumerRequestTask = new Task(r => consumerRequestAction(confirm), cancellationToken);
                                 consumerRequestTask.RunSynchronously();
+
+                                //add to local queue
+                                messagesQueue.Add((confirm.Id, data, sw.Elapsed.TotalSeconds));
                             }
                         }
                         catch (Exception e)
