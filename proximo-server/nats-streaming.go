@@ -18,6 +18,8 @@ type natsStreamingHandler struct {
 
 func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	conn, err := stan.Connect(h.clusterID, consumer+generateID(), stan.NatsURL(h.url))
 	if err != nil {
 		return err
@@ -25,6 +27,8 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 	defer conn.Close()
 
 	ackQueue := make(chan *stan.Msg, 32) // TODO: configurable buffer
+
+	ackErrors := make(chan error)
 
 	var wg sync.WaitGroup
 
@@ -38,10 +42,12 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 				case cr := <-confirmRequest:
 					seq, err := strconv.ParseUint(cr.MsgID, 10, 64)
 					if err != nil {
-						panic(fmt.Sprintf("failed to parse message sequence '%v' TODO: change this from a panic", cr.MsgID))
+						ackErrors <- fmt.Errorf("ailed to parse message sequence '%v' TODO: change this from a panic", cr.MsgID)
+						return
 					}
 					if seq != msg.Sequence {
-						panic(fmt.Sprintf("unexpected message sequence. was %v but wanted %v. TODO: change this from a panic", seq, msg.Sequence))
+						ackErrors <- fmt.Errorf("unexpected message sequence. was %v but wanted %v. TODO: change this from a panic", seq, msg.Sequence)
+						return
 					}
 					msg.Ack()
 				case <-ctx.Done():
@@ -75,10 +81,17 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 		return err
 	}
 
-	<-ctx.Done()
-	wg.Wait()
+	select {
+	case <-ctx.Done():
+		wg.Wait()
+		return conn.Close()
+	case err := <-ackErrors:
+		cancel()
+		wg.Wait()
+		conn.Close()
+		return err
+	}
 
-	return conn.Close()
 }
 
 func (h *natsStreamingHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
