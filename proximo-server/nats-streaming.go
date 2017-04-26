@@ -40,11 +40,11 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 				case cr := <-confirmRequest:
 					seq, err := strconv.ParseUint(cr.MsgID, 10, 64)
 					if err != nil {
-						ackErrors <- fmt.Errorf("ailed to parse message sequence '%v' TODO: change this from a panic", cr.MsgID)
+						ackErrors <- fmt.Errorf("failed to parse message sequence '%v'", cr.MsgID)
 						return
 					}
 					if seq != msg.Sequence {
-						ackErrors <- fmt.Errorf("unexpected message sequence. was %v but wanted %v. TODO: change this from a panic", seq, msg.Sequence)
+						ackErrors <- fmt.Errorf("unexpected message sequence. was %v but wanted %v.", seq, msg.Sequence)
 						return
 					}
 					msg.Ack()
