@@ -10,7 +10,7 @@
     <StartupObject />
     <RootNamespace>proximo_dotnet</RootNamespace>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Version>0.1.3</Version>
+    <Version>0.1.4</Version>
   </PropertyGroup>
  
   <ItemGroup>
