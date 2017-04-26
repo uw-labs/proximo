@@ -18,8 +18,6 @@ type natsStreamingHandler struct {
 
 func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
 
-	ctx, cancel := context.WithCancel(ctx)
-
 	conn, err := stan.Connect(h.clusterID, consumer+generateID(), stan.NatsURL(h.url))
 	if err != nil {
 		return err
@@ -86,7 +84,6 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 		wg.Wait()
 		return conn.Close()
 	case err := <-ackErrors:
-		cancel()
 		wg.Wait()
 		conn.Close()
 		return err
