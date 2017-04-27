@@ -25,6 +25,8 @@ namespace proximo_dotnet
             _client = messageSourceClient;
             _clientId = clientId;
             _topic = topic;
+
+            Console.WriteLine($"Consumer {_clientId} registered interest in {_topic}");
         }
 
         /// <summary>
@@ -149,6 +151,8 @@ namespace proximo_dotnet
             _client = messageSinkClient;
             _clientId = clientId;
             _topic = topic;
+
+            Console.WriteLine($"Publisher {_clientId} registered interest in {_topic}");
         }
 
         /// <summary>
