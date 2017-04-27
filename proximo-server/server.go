@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log"
 	"strings"
 )
 
@@ -73,6 +74,7 @@ func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 	select {
 	case sr := <-startRequest:
 		topic = sr.GetTopic()
+		log.Printf("Consumer started from a client with topic: %s", topic)
 		consumer = sr.GetConsumer()
 	case <-ctx.Done():
 		return nil //ctx.Err()
@@ -160,6 +162,7 @@ func (s *server) Publish(stream MessageSink_PublishServer) error {
 	select {
 	case sr := <-startRequest:
 		topic = sr.GetTopic()
+		log.Printf("Publish started from a client with topic: %s", topic)
 	case <-ctx.Done():
 		return nil //ctx.Err()
 	}

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/nats-io/go-nats-streaming"
-	"github.com/nats-io/go-nats-streaming/pb"
 )
 
 type natsStreamingHandler struct {
@@ -66,7 +65,7 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 		topic,
 		consumer,
 		f,
-		stan.StartAt(pb.StartPosition_First),
+		//stan.StartAt(pb.StartPosition_First),
 		stan.DurableName(consumer),
 		stan.SetManualAckMode(),
 		stan.AckWait(60*time.Second),
