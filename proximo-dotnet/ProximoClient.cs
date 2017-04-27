@@ -32,31 +32,13 @@ namespace proximo_dotnet
         /// </summary>
         /// <param name="messagesQueue">The in-memory queue. (id, message, time spent)</param>
         /// /// <param name="cancellationToken">The cancellation token.</param>
-        public async Task ConsumeMessages(List<(string, string, double)> messagesQueue, CancellationToken cancellationToken)
+        public async Task ConsumeMessages(Action<(string, string), CancellationToken> consumeHandler, CancellationToken cancellationToken)
         {
-            var confirmations = new Queue<Message>();
             try
             {
                 using (var call = _client.Consume())
                 {
-                    Stopwatch sw = null;
-                    Action<Message> consumerRequestAction = (async (Message confMsg) =>
-                    {
-                        //Confirmm message was received.
-                        var cr = new ConsumerRequest
-                        {
-                            Confirmation = new Confirmation { MsgID = confMsg.Id }
-                        };
-
-                        try
-                        {
-                            await call.RequestStream.WriteAsync(cr);
-                        }
-                        catch (Exception e)
-                        {
-                            throw e;
-                        }
-                    });
+                    //Stopwatch sw = null;
 
                     var responseReaderTask = Task.Run(() =>
                     {
@@ -65,17 +47,12 @@ namespace proximo_dotnet
                         {
                             while (call.ResponseStream.MoveNext(cancellationToken).Result)
                             {
-                                sw = Stopwatch.StartNew();
+                                //sw = Stopwatch.StartNew();
 
                                 var confirm = call.ResponseStream.Current;
-                                confirmations.Enqueue(confirm);
                                 var data = confirm.Data.ToString(Encoding.UTF8);
 
-                                var consumerRequestTask = new Task(r => consumerRequestAction(confirm), cancellationToken);
-                                consumerRequestTask.RunSynchronously();
-
-                                //add to local queue
-                                messagesQueue.Add((confirm.Id, data, sw.Elapsed.TotalSeconds));
+                                consumeHandler((confirm.Id, data), cancellationToken);
                             }
                         }
                         catch (Exception e)
@@ -103,7 +80,39 @@ namespace proximo_dotnet
                 throw e;
             }
         }
+
+        public async Task<bool> AcknowledgeMessage(string messageId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                using (var call = _client.Consume())
+                {
+                    //Confirmm message was received.
+                    var cr = new ConsumerRequest
+                    {
+                        Confirmation = new Confirmation { MsgID = messageId }
+                    };
+
+                    try
+                    {
+                        await call.RequestStream.WriteAsync(cr);
+                    }
+                    catch (Exception e)
+                    {
+                        throw e;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                throw e;
+            }
+
+            return true;
+        }
+
     }
+
 
 
     /// <summary>
@@ -131,7 +140,7 @@ namespace proximo_dotnet
         {
             (string, byte[]) converted = (message.Item1, Encoding.UTF8.GetBytes(message.Item2));
 
-            await PublishMessages(converted, receiveQueue);
+            await PublishMessages(converted);
         }
 
         /// <summary>
@@ -139,8 +148,9 @@ namespace proximo_dotnet
         /// </summary>
         /// <param name="messagesList">A list of byte[] messages</param>
         /// <param name="receiveQueue">The in-memory queue.</param>
-        public async Task PublishMessages((string, byte[]) message, Queue<string> receiveQueue)
+        public async Task<string> PublishMessages((string, byte[]) message)
         {
+            string response = null;
             try
             {
                 var request = new Proximo.Message
@@ -158,7 +168,8 @@ namespace proximo_dotnet
                             while (call.ResponseStream.MoveNext().Result)
                             {
                                 var confirm = call.ResponseStream.Current;
-                                receiveQueue.Enqueue(confirm.MsgID);
+
+                                response = confirm.MsgID;
                                 break;
                             }
                         }
@@ -198,6 +209,9 @@ namespace proximo_dotnet
             {
                 throw e;
             }
+
+            return response;
         }
+
     }
 }

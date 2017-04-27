@@ -17,6 +17,6 @@ namespace proximo_dotnet
         /// </summary>
         /// <param name="messagesList">A list of byte[] messages</param>
         /// <param name="receiveQueue">The in-memory queue.</param>
-        Task PublishMessages((string, byte[]) message, Queue<string> receiveQueue);
+        Task<string> PublishMessages((string, byte[]) message);
     }
 }
