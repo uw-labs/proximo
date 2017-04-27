@@ -32,7 +32,7 @@ namespace proximo_dotnet
         /// </summary>
         /// <param name="messagesQueue">The in-memory queue. (id, message, time spent)</param>
         /// /// <param name="cancellationToken">The cancellation token.</param>
-        public async Task ConsumeMessages(Action<(string, string), CancellationToken> consumeHandler, CancellationToken cancellationToken)
+        public async Task ConsumeMessages(Func<(string, string), CancellationToken, Task> consumeHandler, CancellationToken cancellationToken)
         {
             try
             {
@@ -40,7 +40,7 @@ namespace proximo_dotnet
                 {
                     //Stopwatch sw = null;
 
-                    var responseReaderTask = Task.Run(() =>
+                    var responseReaderTask = Task.Run(async () =>
                     {
                         //Reading messages
                         try
@@ -52,12 +52,9 @@ namespace proximo_dotnet
                                 var confirm = call.ResponseStream.Current;
                                 var data = confirm.Data.ToString(Encoding.UTF8);
 
-                                consumeHandler((confirm.Id, data), cancellationToken);
-                                //var consumerRequestTask = new Task(r => consumerRequestAction(confirm), cancellationToken);
-                                //consumerRequestTask.RunSynchronously();
+                                consumeHandler((confirm.Id, data), cancellationToken).Wait();
 
-                                //add to local queue
-                                messagesQueue.Add((confirm.Id, data, sw.Elapsed.TotalSeconds));
+                               Thread.Sleep(10);
 
                                 var cr = new ConsumerRequest
                                 {
@@ -72,7 +69,6 @@ namespace proximo_dotnet
                                 {
                                     throw e;
                                 }
->>>>>>> origin/dotnet
                             }
                         }
                         catch (Exception e)
