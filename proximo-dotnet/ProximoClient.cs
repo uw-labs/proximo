@@ -53,6 +53,26 @@ namespace proximo_dotnet
                                 var data = confirm.Data.ToString(Encoding.UTF8);
 
                                 consumeHandler((confirm.Id, data), cancellationToken);
+                                //var consumerRequestTask = new Task(r => consumerRequestAction(confirm), cancellationToken);
+                                //consumerRequestTask.RunSynchronously();
+
+                                //add to local queue
+                                messagesQueue.Add((confirm.Id, data, sw.Elapsed.TotalSeconds));
+
+                                var cr = new ConsumerRequest
+                                {
+                                    Confirmation = new Confirmation { MsgID = confirm.Id }
+                                };
+
+                                try
+                                {
+                                    call.RequestStream.WriteAsync(cr).Wait();
+                                }
+                                catch (Exception e)
+                                {
+                                    throw e;
+                                }
+>>>>>>> origin/dotnet
                             }
                         }
                         catch (Exception e)
