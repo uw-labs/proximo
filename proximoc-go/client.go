@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 )
 
@@ -109,7 +110,8 @@ func ConsumeContext(ctx context.Context, proximoAddress string, consumer string,
 
 func DialProducer(ctx context.Context, proximoAddress string, topic string) (*ProducerConn, error) {
 	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithInsecure())
+	//	opts = append(opts, grpc.WithInsecure())
+	opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(nil)))
 
 	conn, err := grpc.Dial(proximoAddress, opts...)
 	if err != nil {

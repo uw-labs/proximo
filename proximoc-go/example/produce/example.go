@@ -10,7 +10,8 @@ import (
 func main() {
 	c, err := proximoc.DialProducer(
 		context.Background(),
-		"127.0.0.1:6868",
+		"bill-integration-proximo.dev.uw.systems:443",
+		//	"localhost:6868",
 		"example-topic", // topic name
 	)
 	if err != nil {
