@@ -10,12 +10,19 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 )
 
 func ConsumeContext(ctx context.Context, proximoAddress string, consumer string, topic string, f func(*Message) error) error {
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithInsecure())
+	return consumeContext(ctx, proximoAddress, consumer, topic, f, grpc.WithInsecure())
+}
+
+func ConsumeContextTLS(ctx context.Context, proximoAddress string, consumer string, topic string, f func(*Message) error) error {
+	return consumeContext(ctx, proximoAddress, consumer, topic, f, grpc.WithTransportCredentials(credentials.NewTLS(nil)))
+}
+
+func consumeContext(ctx context.Context, proximoAddress string, consumer string, topic string, f func(*Message) error, opts ...grpc.DialOption) error {
 
 	conn, err := grpc.Dial(proximoAddress, opts...)
 	if err != nil {
@@ -108,8 +115,14 @@ func ConsumeContext(ctx context.Context, proximoAddress string, consumer string,
 }
 
 func DialProducer(ctx context.Context, proximoAddress string, topic string) (*ProducerConn, error) {
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithInsecure())
+	return dialProducer(ctx, proximoAddress, topic, grpc.WithInsecure())
+}
+
+func DialProducerTLS(ctx context.Context, proximoAddress string, topic string) (*ProducerConn, error) {
+	return dialProducer(ctx, proximoAddress, topic, grpc.WithTransportCredentials(credentials.NewTLS(nil)))
+}
+
+func dialProducer(ctx context.Context, proximoAddress string, topic string, opts ...grpc.DialOption) (*ProducerConn, error) {
 
 	conn, err := grpc.Dial(proximoAddress, opts...)
 	if err != nil {
