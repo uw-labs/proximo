@@ -10,7 +10,7 @@ namespace proximo_dotnet
         /// </summary>
         /// <param name="messagesList">A list of string messages</param>
         /// <param name="receiveQueue">The in-memory queue.</param>
-        Task PublishMessages((string, string) message);
+        Task<string> PublishMessages((string, string) message);
 
         /// <summary>
         /// Publish messages to proximo server and adds the confirmation ids to an in-memory queue

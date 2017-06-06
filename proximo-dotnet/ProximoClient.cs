@@ -156,11 +156,11 @@ namespace proximo_dotnet
         /// </summary>
         /// <param name="messagesList">A list of string messages</param>
         /// <param name="receiveQueue">The in-memory queue.</param>
-        public async Task PublishMessages((string, string) message)
+        public async Task<string> PublishMessages((string, string) message)
         {
             (string, byte[]) converted = (message.Item1, Encoding.UTF8.GetBytes(message.Item2));
 
-            await PublishMessages(converted);
+            return await PublishMessages(converted);
         }
 
         /// <summary>
