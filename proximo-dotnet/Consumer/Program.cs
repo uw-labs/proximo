@@ -9,32 +9,26 @@ namespace proximo_consumer
 {
     public class Program
     {
+        private static IConsumerClient client;
+
+        public static async Task MessageHandler((string, string) message, CancellationToken cancellationToken)
+        {  
+            await client.AcknowledgeMessage(message.Item1, cancellationToken);
+        }
+
+
         public static void Main(string[] args)
         {
             var channel = new Grpc.Core.Channel("127.0.0.1:6868", ChannelCredentials.Insecure);
-            IConsumerClient client = new ConsumerClient(new Proximo.MessageSource.MessageSourceClient(channel), "dotnetc-client", "new-topic");
-            var messagesQ = new List<(string, string, double)>();
+            client = new ConsumerClient(new Proximo.MessageSource.MessageSourceClient(channel), "dotnetc-client", "new-topic");
 
-            Action useMessagesAction = (() =>
-            {
-                for (;;)
-                {
-                    Thread.Sleep(500);
-                    if (messagesQ.Count > 0)
-                    {
-                        var msg = messagesQ;
-                        Console.WriteLine($"Got {messagesQ.Count} messages.'");
-                    }
-                }
-            });
-            var startTask = new Task(r => useMessagesAction(), new CancellationToken());
-            startTask.Start();
+            Func<(string, string), CancellationToken, Task> messageHandlerAction = MessageHandler;
 
             try
             {
                 // Consume messages.
                 Console.WriteLine("*** Start consuming messages");
-                client.ConsumeMessages(messagesQ, new CancellationToken()).Wait();
+                client.ConsumeMessages(messageHandlerAction, new CancellationToken()).Wait();
             }
             catch (Exception e)
             {
@@ -42,9 +36,7 @@ namespace proximo_consumer
             }
 
             channel.ShutdownAsync().Wait();
-
-            Console.WriteLine("Press any key to exit...");
-            Console.ReadKey();
+            Console.WriteLine("*** Consumer stopped");
         }
     }
 }

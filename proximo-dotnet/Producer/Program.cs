@@ -45,7 +45,7 @@ namespace proximo_producer
                 Console.WriteLine("*** Start publishing the messages");
                 foreach (var item in messagesL)
                 {
-                    client.PublishMessages(item, receiveQ).Wait();
+                    client.PublishMessages(item).Wait();
                 }
             }
             catch (Exception e)

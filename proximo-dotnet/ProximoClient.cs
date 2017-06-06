@@ -54,7 +54,7 @@ namespace proximo_dotnet
                                 var confirm = call.ResponseStream.Current;
                                 var data = confirm.Data.ToString(Encoding.UTF8);
 
-                                consumeHandler((confirm.Id, data), cancellationToken).Wait();
+                                await consumeHandler((confirm.Id, data), cancellationToken);
 
                                Thread.Sleep(10);
 
@@ -156,7 +156,7 @@ namespace proximo_dotnet
         /// </summary>
         /// <param name="messagesList">A list of string messages</param>
         /// <param name="receiveQueue">The in-memory queue.</param>
-        public async Task PublishMessages((string, string) message, Queue<string> receiveQueue)
+        public async Task PublishMessages((string, string) message)
         {
             (string, byte[]) converted = (message.Item1, Encoding.UTF8.GetBytes(message.Item2));
 
@@ -167,7 +167,6 @@ namespace proximo_dotnet
         /// Publish messages to proximo server and adds the confirmation ids to an in-memory queue
         /// </summary>
         /// <param name="messagesList">A list of byte[] messages</param>
-        /// <param name="receiveQueue">The in-memory queue.</param>
         public async Task<string> PublishMessages((string, byte[]) message)
         {
             string response = null;
