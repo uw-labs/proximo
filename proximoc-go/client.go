@@ -25,7 +25,7 @@ func ConsumeContextTLS(ctx context.Context, proximoAddress string, consumer stri
 
 func consumeContext(ctx context.Context, proximoAddress string, consumer string, topic string, f func(*Message) error, opts ...grpc.DialOption) error {
 
-	conn, err := grpc.Dial(proximoAddress, opts...)
+	conn, err := grpc.DialContext(ctx, proximoAddress, opts...)
 	if err != nil {
 		grpclog.Fatalf("fail to dial: %v", err)
 	}
@@ -125,7 +125,7 @@ func DialProducerTLS(ctx context.Context, proximoAddress string, topic string, c
 
 func dialProducer(ctx context.Context, proximoAddress string, topic string, opts ...grpc.DialOption) (*ProducerConn, error) {
 
-	conn, err := grpc.Dial(proximoAddress, opts...)
+	conn, err := grpc.DialContext(ctx, proximoAddress, opts...)
 	if err != nil {
 		return nil, err
 	}
