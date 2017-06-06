@@ -3,6 +3,7 @@ package proximoc
 import (
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -18,8 +19,8 @@ func ConsumeContext(ctx context.Context, proximoAddress string, consumer string,
 	return consumeContext(ctx, proximoAddress, consumer, topic, f, grpc.WithInsecure())
 }
 
-func ConsumeContextTLS(ctx context.Context, proximoAddress string, consumer string, topic string, f func(*Message) error) error {
-	return consumeContext(ctx, proximoAddress, consumer, topic, f, grpc.WithTransportCredentials(credentials.NewTLS(nil)))
+func ConsumeContextTLS(ctx context.Context, proximoAddress string, consumer string, topic string, f func(*Message) error, conf *tls.Config) error {
+	return consumeContext(ctx, proximoAddress, consumer, topic, f, grpc.WithTransportCredentials(credentials.NewTLS(conf)))
 }
 
 func consumeContext(ctx context.Context, proximoAddress string, consumer string, topic string, f func(*Message) error, opts ...grpc.DialOption) error {
@@ -118,8 +119,8 @@ func DialProducer(ctx context.Context, proximoAddress string, topic string) (*Pr
 	return dialProducer(ctx, proximoAddress, topic, grpc.WithInsecure())
 }
 
-func DialProducerTLS(ctx context.Context, proximoAddress string, topic string) (*ProducerConn, error) {
-	return dialProducer(ctx, proximoAddress, topic, grpc.WithTransportCredentials(credentials.NewTLS(nil)))
+func DialProducerTLS(ctx context.Context, proximoAddress string, topic string, conf *tls.Config) (*ProducerConn, error) {
+	return dialProducer(ctx, proximoAddress, topic, grpc.WithTransportCredentials(credentials.NewTLS(conf)))
 }
 
 func dialProducer(ctx context.Context, proximoAddress string, topic string, opts ...grpc.DialOption) (*ProducerConn, error) {
