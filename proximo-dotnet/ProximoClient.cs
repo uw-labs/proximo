@@ -18,13 +18,15 @@ namespace proximo_dotnet
     {
         readonly MessageSource.MessageSourceClient _client;
         readonly string _clientId;
+        readonly string _topic;
 
-        public ConsumerClient(MessageSource.MessageSourceClient messageSourceClient, string clientId)
+        public ConsumerClient(MessageSource.MessageSourceClient messageSourceClient, string clientId, string topic)
         {
             _client = messageSourceClient;
             _clientId = clientId;
+            _topic = topic;
 
-            Console.WriteLine($"Consumer {_clientId} connected");
+            Console.WriteLine($"Consumer {_clientId} registered interest in {_topic}");
         }
 
         /// <summary>
@@ -32,7 +34,7 @@ namespace proximo_dotnet
         /// </summary>
         /// <param name="messagesQueue">The in-memory queue. (id, message, time spent)</param>
         /// /// <param name="cancellationToken">The cancellation token.</param>
-        public async Task ConsumeMessages(Func<(string, string), CancellationToken, Task> consumeHandler, CancellationToken cancellationToken, string topic)
+        public async Task ConsumeMessages(Func<(string, string), CancellationToken, Task> consumeHandler, CancellationToken cancellationToken)
         {
             try
             {
@@ -83,7 +85,7 @@ namespace proximo_dotnet
                         StartRequest = new StartConsumeRequest
                         {
                             Consumer = _clientId,
-                            Topic = topic
+                            Topic = _topic
                         }
                     };
 
@@ -139,13 +141,15 @@ namespace proximo_dotnet
     {
         readonly MessageSink.MessageSinkClient _client;
         readonly string _clientId;
+        readonly string _topic;
 
-        public PublisherClient(MessageSink.MessageSinkClient messageSinkClient, string clientId)
+        public PublisherClient(MessageSink.MessageSinkClient messageSinkClient, string clientId,string topic)
         {
             _client = messageSinkClient;
             _clientId = clientId;
+            _topic = topic;
 
-            Console.WriteLine($"Publisher {_clientId} connected");
+            Console.WriteLine($"Publisher {_clientId} registered interest in {_topic}");
         }
 
         /// <summary>
@@ -153,18 +157,18 @@ namespace proximo_dotnet
         /// </summary>
         /// <param name="messagesList">A list of string messages</param>
         /// <param name="receiveQueue">The in-memory queue.</param>
-        public async Task<string> PublishMessages((string, string) message, string topic)
+        public async Task<string> PublishMessages((string, string) message)
         {
             (string, byte[]) converted = (message.Item1, Encoding.UTF8.GetBytes(message.Item2));
 
-            return await PublishMessages(converted, topic);
+            return await PublishMessages(converted);
         }
 
         /// <summary>
         /// Publish messages to proximo server and adds the confirmation ids to an in-memory queue
         /// </summary>
         /// <param name="messagesList">A list of byte[] messages</param>
-        public async Task<string> PublishMessages((string, byte[]) message, string topic)
+        public async Task<string> PublishMessages((string, byte[]) message)
         {
             string response = null;
             try
@@ -198,7 +202,7 @@ namespace proximo_dotnet
 
                     var spr = new PublisherRequest
                     {
-                        StartRequest = new StartPublishRequest { Topic = topic }
+                        StartRequest = new StartPublishRequest { Topic = _topic }
                     };
                     await call.RequestStream.WriteAsync(spr);
 
