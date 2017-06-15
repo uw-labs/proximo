@@ -15,8 +15,8 @@ namespace proximo_producer
     {
         public static void Main(string[] args)
         {
-            var channel = new Grpc.Core.Channel("127.0.0.1:6868", ChannelCredentials.Insecure);
-            IPublisherClient client = new PublisherClient(new Proximo.MessageSink.MessageSinkClient(channel), "dotnetp-client", "new-topic");
+            var channel = new Grpc.Core.Channel("localhost:6868", ChannelCredentials.Insecure);
+            IPublisherClient client = new PublisherClient(new Proximo.MessageSink.MessageSinkClient(channel), "consumer1", "int_test_topic");
 
             var messagesL = new List<(string, string)>() {
                 ("1", "first message"),

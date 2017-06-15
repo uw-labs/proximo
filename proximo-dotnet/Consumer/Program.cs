@@ -13,14 +13,14 @@ namespace proximo_consumer
 
         public static async Task MessageHandler((string, string) message, CancellationToken cancellationToken)
         {  
-            await client.AcknowledgeMessage(message.Item1, cancellationToken);
+            await client.AcknowledgeMessage(message.Item1);
         }
 
 
         public static void Main(string[] args)
         {
-            var channel = new Grpc.Core.Channel("127.0.0.1:6868", ChannelCredentials.Insecure);
-            client = new ConsumerClient(new Proximo.MessageSource.MessageSourceClient(channel), "dotnetc-client", "new-topic");
+            var channel = new Grpc.Core.Channel("localhost:6868", ChannelCredentials.Insecure);
+            client = new ConsumerClient(new Proximo.MessageSource.MessageSourceClient(channel), "producer1", "int_test_topic");
 
             Func<(string, string), CancellationToken, Task> messageHandlerAction = MessageHandler;
 

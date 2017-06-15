@@ -14,6 +14,6 @@ namespace proximo_dotnet
         /// <param name="messagesQueue">The in-memory queue. (id, message, time spent)</param>
         /// /// <param name="cancellationToken">The cancellation token.</param>
         Task ConsumeMessages(Func<(string, string), CancellationToken, Task> consumeHandler, CancellationToken cancellationToken);
-        Task<bool> AcknowledgeMessage(string messageId, CancellationToken cancellationToken);
+        Task<bool> AcknowledgeMessage(string messageId);
     }
 }

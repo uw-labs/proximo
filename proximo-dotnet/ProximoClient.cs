@@ -99,7 +99,8 @@ namespace proximo_dotnet
             }
         }
 
-        public async Task<bool> AcknowledgeMessage(string messageId, CancellationToken cancellationToken)
+        
+        public async Task<bool> AcknowledgeMessage(string messageId)
         {
             try
             {
