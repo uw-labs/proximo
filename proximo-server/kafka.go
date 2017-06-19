@@ -70,16 +70,20 @@ func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClie
 			select {
 			case forClient <- &Message{Data: msg.Value, Id: confirmID}:
 			case <-ctx.Done():
+				grpclog.Println("context is done")
 				return c.Close()
 			}
 			select {
 			case toConfirmID <- confirmID:
 			case <-ctx.Done():
+				grpclog.Println("context is done")
 				return c.Close()
 			}
 		case err := <-c.Errors():
+			grpclog.Printf("kafka error causing consume exit %v\n", c.Errors())
 			return err
 		case <-ctx.Done():
+			grpclog.Println("context is done")
 			return c.Close()
 		}
 	}
