@@ -80,7 +80,7 @@ func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClie
 				return c.Close()
 			}
 		case err := <-c.Errors():
-			grpclog.Printf("kafka error causing consume exit %v\n", c.Errors())
+			grpclog.Printf("kafka error causing consume exit %v\n", err)
 			return err
 		case <-ctx.Done():
 			grpclog.Println("context is done")
