@@ -56,7 +56,7 @@ namespace proximo_dotnet
 
                                 await consumeHandler((confirm.Id, data), cancellationToken);
 
-                               Thread.Sleep(10);
+                               //Thread.Sleep(10);
 
                                 var cr = new ConsumerRequest
                                 {
