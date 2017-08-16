@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -65,7 +66,10 @@ func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClie
 
 	for {
 		select {
-		case msg := <-c.Messages():
+		case msg, ok := <-c.Messages():
+			if !ok {
+				return errors.New("kafka message channel was closed")
+			}
 			confirmID := fmt.Sprintf("%d-%d", msg.Offset, msg.Partition)
 			select {
 			case forClient <- &Message{Data: msg.Value, Id: confirmID}:
