@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/pkg/errors"
 	"github.com/streadway/amqp"
 )
 
@@ -101,4 +102,19 @@ func (h *amqpHandler) HandleConsume(ctx context.Context, consumer, topic string,
 
 func (h *amqpHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
 	panic("not implemented")
+}
+
+func (h *amqpHandler) Status() (bool, []error) {
+	c, err := amqp.Dial(h.address)
+	if err != nil {
+		return false, []error{errors.Wrapf(err, "failed to dial %s", h.address)}
+	}
+	s := c.ConnectionState()
+	if !s.HandshakeComplete {
+		return false, []error{errors.New("handshake not completed")}
+	}
+	if err := c.Close(); err != nil {
+		return false, []error{errors.Wrapf(err, "failed to close connection to %s", h.address)}
+	}
+	return true, nil
 }
