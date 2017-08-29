@@ -4,15 +4,41 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
-	"strings"
 
+	"github.com/gorilla/mux"
 	"github.com/jawher/mow.cli"
+	"github.com/pkg/errors"
+	"github.com/utilitywarehouse/go-operational/op"
 	"google.golang.org/grpc"
 )
 
+var gitHash string
+
+type link struct {
+	description string
+	url         string
+}
+
+var appMeta = struct {
+	name        string
+	description string
+	owner       string
+	slack       string
+	links       []link
+}{
+	name:        "proximo",
+	description: "Interoperable GRPC based publish/subscribe",
+	owner:       "energy",
+	slack:       "#industryparticipation",
+	links: []link{
+		{"vcs", "https://github.com/utilitywarehouse/proximo"},
+	},
+}
+
 func main() {
-	app := cli.App("proximo", "GRPC Proxy gateway for message queue systems")
+	app := cli.App(appMeta.name, appMeta.description)
 
 	port := app.Int(cli.IntOpt{
 		Name:   "port",
@@ -21,32 +47,30 @@ func main() {
 		EnvVar: "PROXIMO_PORT",
 	})
 
+	probePort := app.Int(cli.IntOpt{
+		Name:   "probe-port",
+		Value:  8080,
+		Desc:   "Port to listen for healtcheck requests",
+		EnvVar: "PROXIMO_PROBE_PORT",
+	})
+
+	cr := &CommandReceiver{}
 	app.Command("kafka", "Use kafka backend", func(cmd *cli.Cmd) {
-		brokerString := cmd.String(cli.StringOpt{
-			Name:   "brokers",
-			Value:  "localhost:9092",
+		log.Printf("Using kafka testing backend")
+		brokers := *cmd.Strings(cli.StringsOpt{
+			Name: "brokers",
+			Value: []string{
+				"localhost:9092",
+			},
 			Desc:   "Broker addresses e.g., \"server1:9092,server2:9092\"",
 			EnvVar: "PROXIMO_KAFKA_BROKERS",
 		})
 		cmd.Action = func() {
-			brokers := strings.Split(*brokerString, ",")
-
-			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-			if err != nil {
-				log.Fatalf("failed to listen: %v", err)
-			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
-			kh := &kafkaHandler{
+			cr.handler = &kafkaHandler{
 				brokers: brokers,
 			}
-			log.Printf("Using kafka at %s\n", brokers)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
-			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
-
 	app.Command("amqp", "Use AMQP backend", func(cmd *cli.Cmd) {
 		address := cmd.String(cli.StringOpt{
 			Name:   "address",
@@ -55,23 +79,11 @@ func main() {
 			EnvVar: "PROXIMO_AMQP_ADDRESS",
 		})
 		cmd.Action = func() {
-
-			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-			if err != nil {
-				log.Fatalf("failed to listen: %v", err)
-			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
-			kh := &amqpHandler{
+			cr.handler = &amqpHandler{
 				address: *address,
 			}
-			log.Printf("Using AMQP at %s\n", *address)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
-			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
-
 	app.Command("nats-streaming", "Use NATS streaming backend", func(cmd *cli.Cmd) {
 		url := cmd.String(cli.StringOpt{
 			Name:   "url",
@@ -86,24 +98,12 @@ func main() {
 			EnvVar: "PROXIMO_NATS_CLUSTER_ID",
 		})
 		cmd.Action = func() {
-
-			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-			if err != nil {
-				log.Fatalf("failed to listen: %v", err)
-			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
-			kh := &natsStreamingHandler{
+			cr.handler = &natsStreamingHandler{
 				url:       *url,
 				clusterID: *cid,
 			}
-			log.Printf("Using NATS streaming server at %s with cluster id %s\n", *url, *cid)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
-			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
-
 	app.Command("nats", "Use NATS backend", func(cmd *cli.Cmd) {
 		url := cmd.String(cli.StringOpt{
 			Name:   "url",
@@ -112,39 +112,60 @@ func main() {
 			EnvVar: "PROXIMO_NATS_URL",
 		})
 		cmd.Action = func() {
-
-			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-			if err != nil {
-				log.Fatalf("failed to listen: %v", err)
-			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
-			kh := &natsHandler{
+			cr.handler = &natsHandler{
 				url: *url,
 			}
-			log.Printf("Using NATS at %s\n", *url)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
-			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
-
 	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
 		cmd.Action = func() {
-
-			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-			if err != nil {
-				log.Fatalf("failed to listen: %v", err)
-			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
-			kh := newMemHandler()
-			log.Printf("Using in memory testing backend")
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
-			log.Fatal(grpcServer.Serve(lis))
+			cr.handler = newMemHandler()
 		}
 	})
 
-	log.Fatal(app.Run(os.Args))
+	app.After = func() {
+		cr.ServeStatus(*probePort)
+		if err := cr.Serve("tcp", *port); err != nil {
+			log.Fatal(err)
+		}
+	}
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal("App stopped with error")
+	}
+}
+
+type CommandReceiver struct {
+	handler handler
+}
+
+func (r *CommandReceiver) Serve(connType string, port int) error {
+	lis, err := net.Listen(connType, fmt.Sprintf(":%d", port))
+	if err != nil {
+		errors.Wrap(err, "failed to listen")
+	}
+	var opts []grpc.ServerOption
+	grpcServer := grpc.NewServer(opts...)
+	RegisterMessageSourceServer(grpcServer, &server{r.handler})
+	RegisterMessageSinkServer(grpcServer, &server{r.handler})
+	if err := grpcServer.Serve(lis); err != nil {
+		return errors.Wrap(err, "failed to serve grpc")
+	}
+	return nil
+}
+
+func (r *CommandReceiver) ServeStatus(port int) {
+	router := mux.NewRouter()
+
+	probe := router.PathPrefix("/__/").Subrouter()
+	probe.Methods(http.MethodGet).Handler(op.NewHandler(getOpStatus(r.handler)))
+
+	server := http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: router,
+	}
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			log.Fatal(errors.Wrap(err, "failed to server status"))
+		}
+	}()
 }

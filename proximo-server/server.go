@@ -14,9 +14,14 @@ var (
 	errInvalidRequest = errors.New("invalid consumer request - this is possibly a bug in your client library")
 )
 
+type statuser interface {
+	Status() (bool, []error)
+}
+
 type handler interface {
 	HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error
 	HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error
+	statuser
 }
 
 type server struct {

@@ -52,6 +52,10 @@ func (h *memHandler) HandleProduce(ctx context.Context, topic string, forClient 
 	}
 }
 
+func (h *memHandler) Status() (bool, []error) {
+	return true, nil
+}
+
 func (h memHandler) loop() {
 	subs := make(map[string]map[string][]*sub)
 
