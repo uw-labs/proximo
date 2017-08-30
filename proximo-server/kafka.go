@@ -2,15 +2,17 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"net"
+
 	"github.com/Shopify/sarama"
-	cluster "github.com/bsm/sarama-cluster"
+	"github.com/bsm/sarama-cluster"
 	"google.golang.org/grpc/grpclog"
+	"github.com/pkg/errors"
 )
 
 type kafkaHandler struct {
@@ -142,4 +144,36 @@ func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClien
 			return nil
 		}
 	}
+}
+
+func (h *kafkaHandler) Status() (bool, error) {
+	errs := make(chan error)
+
+	for _, broker := range h.brokers {
+		go func(broker string) {
+			conn, err := net.DialTimeout("tcp", broker, 10*time.Second)
+			if err != nil {
+				errs <- fmt.Errorf("Failed to connect to broker %s: %v", broker, err)
+				return
+			}
+			if err = conn.Close(); err != nil {
+				errs <- fmt.Errorf("Failed to close connection to broker %s: %v", broker, err)
+				return
+			}
+			errs <- nil
+		}(broker)
+	}
+
+	e := []error{}
+	for range h.brokers {
+		err := <-errs
+		if err != nil {
+			e = append(e, err)
+		}
+	}
+	if len(e) == 0 {
+		return true, nil
+	}
+	return false, errors.Errorf("Series of errors: %v", e)
+
 }

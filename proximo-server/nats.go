@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/nats-io/nats"
+	"github.com/pkg/errors"
 )
 
 type natsHandler struct {
@@ -62,4 +63,15 @@ func (h *natsHandler) HandleProduce(ctx context.Context, topic string, forClient
 			return nil
 		}
 	}
+}
+
+func (h *natsHandler) Status() (bool, error) {
+	conn, err := nats.Connect(h.url)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to connect to %s", h.url)
+	}
+	if conn.Status() == nats.CONNECTED {
+		return false, errors.New("expected connected status")
+	}
+	return true, nil
 }

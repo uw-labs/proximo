@@ -7,8 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nats-io/go-nats"
 	"github.com/nats-io/go-nats-streaming"
 	"github.com/nats-io/go-nats-streaming/pb"
+	"github.com/pkg/errors"
 )
 
 type natsStreamingHandler struct {
@@ -114,5 +116,18 @@ func (h *natsStreamingHandler) HandleProduce(ctx context.Context, topic string, 
 			}
 		}
 	}
+}
 
+func (h *natsStreamingHandler) Status() (bool, error) {
+	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsURL(h.url))
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to connect to %s", h.url)
+	}
+	if conn.NatsConn().Status() != nats.CONNECTED {
+		return false, errors.New("connection status different than CONNECTED")
+	}
+	if err := conn.Close(); err != nil {
+		return false, errors.Wrapf(err, "failed to close connection to %s", h.url)
+	}
+	return true, nil
 }
