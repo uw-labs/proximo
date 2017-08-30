@@ -54,7 +54,9 @@ func main() {
 		EnvVar: "PROXIMO_PROBE_PORT",
 	})
 
-	cr := &CommandReceiver{}
+	cr := &CommandReceiver{
+		counters: NewCounters(),
+	}
 	app.Command("kafka", "Use kafka backend", func(cmd *cli.Cmd) {
 		log.Printf("Using kafka testing backend")
 		brokers := *cmd.Strings(cli.StringsOpt{
@@ -135,7 +137,8 @@ func main() {
 }
 
 type CommandReceiver struct {
-	handler handler
+	handler  handler
+	counters counters
 }
 
 func (r *CommandReceiver) Serve(connType string, port int) error {
@@ -145,8 +148,8 @@ func (r *CommandReceiver) Serve(connType string, port int) error {
 	}
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
-	RegisterMessageSourceServer(grpcServer, &server{r.handler})
-	RegisterMessageSinkServer(grpcServer, &server{r.handler})
+	RegisterMessageSourceServer(grpcServer, &server{r.handler, r.counters})
+	RegisterMessageSinkServer(grpcServer, &server{r.handler, r.counters})
 	if err := grpcServer.Serve(lis); err != nil {
 		return errors.Wrap(err, "failed to serve grpc")
 	}

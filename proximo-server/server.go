@@ -25,7 +25,8 @@ type handler interface {
 }
 
 type server struct {
-	handler handler
+	handler  handler
+	counters counters
 }
 
 func (s *server) Consume(stream MessageSource_ConsumeServer) error {
@@ -104,6 +105,7 @@ func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 	}()
 
 	go func() {
+		s.counters.SourcedMessagesCounter.WithLabelValues(topic).Inc()
 		err := s.handler.HandleConsume(ctx, consumer, topic, forClient, confirmRequest)
 		if err != nil {
 			errors <- err
@@ -112,6 +114,7 @@ func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 
 	select {
 	case err := <-errors:
+		s.counters.ErrorCounter.Inc()
 		return err
 	case <-ctx.Done():
 		return nil
@@ -183,6 +186,7 @@ func (s *server) Publish(stream MessageSink_PublishServer) error {
 	}()
 
 	go func() {
+		s.counters.SinkMessagesCounter.WithLabelValues(topic).Inc()
 		err := s.handler.HandleProduce(ctx, topic, forClient, messages)
 		if err != nil {
 			errors <- err
@@ -191,6 +195,7 @@ func (s *server) Publish(stream MessageSink_PublishServer) error {
 
 	select {
 	case err := <-errors:
+		s.counters.ErrorCounter.Inc()
 		return err
 	case <-ctx.Done():
 		return nil

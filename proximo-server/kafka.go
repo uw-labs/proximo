@@ -3,16 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
 
-	"net"
-
 	"github.com/Shopify/sarama"
 	"github.com/bsm/sarama-cluster"
-	"google.golang.org/grpc/grpclog"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc/grpclog"
 )
 
 type kafkaHandler struct {
