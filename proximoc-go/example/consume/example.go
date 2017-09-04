@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/utilitywarehouse/proximo/proximoc-go"
+	"github.com/uw-labs/proximo/proximoc-go"
 )
 
 func main() {
