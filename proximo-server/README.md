@@ -4,7 +4,7 @@ This is a proximo server implementation that can target Apache Kafka or AMQP ser
 
 ## Installation
 ```
-go get github.com/utilitywarehouse/proximo/proximo-server
+go get github.com/uw-labs/proximo/proximo-server
 ```
 
 ## Usage
