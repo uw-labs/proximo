@@ -5,7 +5,11 @@ import (
 )
 
 func newMemHandler() *memHandler {
-	mh := &memHandler{make(chan *produceReq, 1024), make(chan *sub, 1024)}
+	mh := &memHandler{
+		incomingMessages: make(chan *produceReq, 1024),
+		subs:             make(chan *sub, 1024),
+		last100:          make(map[string][]*Message),
+	}
 	go mh.loop()
 	return mh
 }
@@ -13,6 +17,8 @@ func newMemHandler() *memHandler {
 type memHandler struct {
 	incomingMessages chan *produceReq
 	subs             chan *sub
+
+	last100 map[string][]*Message
 }
 
 func (h *memHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
@@ -67,6 +73,10 @@ func (h memHandler) loop() {
 			forThisConsumer = append(forThisConsumer, s)
 			all[s.consumer] = forThisConsumer
 
+			for _, m := range h.last100[s.topic] {
+				s.msgs <- m
+			}
+
 		case inm := <-h.incomingMessages:
 			consumers := subs[inm.topic]
 			for _, consumer := range consumers {
@@ -85,6 +95,11 @@ func (h memHandler) loop() {
 						remaining = append(remaining, sub)
 					}
 				}
+			}
+
+			h.last100[inm.topic] = append(h.last100[inm.topic], &Message{inm.message.GetData(), generateID()})
+			for len(h.last100[inm.topic]) > 100 {
+				h.last100[inm.topic] = h.last100[inm.topic][1:]
 			}
 		}
 	}
