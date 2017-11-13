@@ -40,7 +40,6 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string
 	}()
 
 	go func() {
-		h.counters.SourcedMessagesCounter.WithLabelValues(topic).Inc()
 		err := h.consume(ctx, c, forClient, toConfirmIds, topic, consumer)
 		if err != nil {
 			errors <- err
@@ -54,6 +53,7 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string
 			if err != nil {
 				return err
 			}
+			h.counters.SourcedMessagesCounter.WithLabelValues(topic).Inc()
 		case <-ctx.Done():
 			return nil
 		case err := <-errors:
