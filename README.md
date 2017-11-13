@@ -5,14 +5,18 @@ It is based on a GRPC interface definition, making it easy to create new client 
 It already supports a number of popular queueing systems, and adding new ones is intended to be simple.
 
 ## Goals
-Expose multiple consumer (fan out) semantics where needed
-Minimise overhead over direct use of a given queuing system
-Allow configuration of the underlying queue system via runtime configuration of Proximo
-Allow replacement of a queueing system with no change to the Proximo client applications
-Enabling easy creation of client libraries for new languages (anything that has GRPC support)
+* Expose multiple consumer (fan out) semantics where needed
+
+* Minimise overhead over direct use of a given queuing system
+
+* Allow configuration of the underlying queue system via runtime configuration of Proximo
+
+* Allow replacement of a queueing system with no change to the Proximo client applications
+
+* Enabling easy creation of client libraries for new languages (anything that has GRPC support)
 
 ## Non goals
-Exposing specific details of the underlying queue system via the client API
+* Exposing specific details of the underlying queue system via the client API
 
 ## Server
 

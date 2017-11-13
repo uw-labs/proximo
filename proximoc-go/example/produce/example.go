@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	proximoc "github.com/utilitywarehouse/proximo/proximoc-go"
+	proximoc "github.com/uw-labs/proximo/proximoc-go"
 )
 
 func main() {

@@ -49,7 +49,10 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 						ackErrors <- fmt.Errorf("unexpected message sequence. was %v but wanted %v.", seq, msg.Sequence)
 						return
 					}
-					msg.Ack()
+					if err := msg.Ack(); err != nil {
+						ackErrors <- fmt.Errorf("failed to ack message with NATS: %v.", err.Error())
+						return
+					}
 				case <-ctx.Done():
 					return
 				}
