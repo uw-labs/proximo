@@ -53,12 +53,11 @@ func main() {
 		Desc:   "Port to listen for healtcheck requests",
 		EnvVar: "PROXIMO_PROBE_PORT",
 	})
-
+	counters := NewCounters()
 	cr := &CommandReceiver{
-		counters: NewCounters(),
+		counters: counters,
 	}
 	app.Command("kafka", "Use kafka backend", func(cmd *cli.Cmd) {
-		log.Printf("Using kafka testing backend")
 		brokers := *cmd.Strings(cli.StringsOpt{
 			Name: "brokers",
 			Value: []string{
@@ -69,7 +68,8 @@ func main() {
 		})
 		cmd.Action = func() {
 			cr.handler = &kafkaHandler{
-				brokers: brokers,
+				brokers:  brokers,
+				counters: counters,
 			}
 		}
 	})

@@ -15,7 +15,8 @@ import (
 )
 
 type kafkaHandler struct {
-	brokers []string
+	brokers  []string
+	counters counters
 }
 
 func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
@@ -39,6 +40,7 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string
 	}()
 
 	go func() {
+		h.counters.SourcedMessagesCounter.WithLabelValues(topic).Inc()
 		err := h.consume(ctx, c, forClient, toConfirmIds, topic, consumer)
 		if err != nil {
 			errors <- err
@@ -138,6 +140,7 @@ func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClien
 			if err != nil {
 				return err
 			}
+			h.counters.SinkMessagesCounter.WithLabelValues(topic).Inc()
 			forClient <- &Confirmation{MsgID: m.GetId()}
 		case <-ctx.Done():
 			return nil

@@ -105,7 +105,6 @@ func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 	}()
 
 	go func() {
-		s.counters.SourcedMessagesCounter.WithLabelValues(topic).Inc()
 		err := s.handler.HandleConsume(ctx, consumer, topic, forClient, confirmRequest)
 		if err != nil {
 			errors <- err
@@ -186,7 +185,6 @@ func (s *server) Publish(stream MessageSink_PublishServer) error {
 	}()
 
 	go func() {
-		s.counters.SinkMessagesCounter.WithLabelValues(topic).Inc()
 		err := s.handler.HandleProduce(ctx, topic, forClient, messages)
 		if err != nil {
 			errors <- err
