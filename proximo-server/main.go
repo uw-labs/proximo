@@ -10,6 +10,7 @@ import (
 	"github.com/jawher/mow.cli"
 	"github.com/uw-labs/proximo"
 	"github.com/uw-labs/proximo/backends/amqp"
+	"github.com/uw-labs/proximo/backends/gcm"
 	"github.com/uw-labs/proximo/backends/kafka"
 	"github.com/uw-labs/proximo/backends/mem"
 	"github.com/uw-labs/proximo/backends/nats"
@@ -161,6 +162,41 @@ func main() {
 				NsqdTcpAddress:   *tcpAddress,
 			}
 			log.Printf("Using nsq  backend")
+			proximo.RegisterMessageSourceServer(grpcServer, &proximo.Server{kh})
+			proximo.RegisterMessageSinkServer(grpcServer, &proximo.Server{kh})
+			log.Fatal(grpcServer.Serve(lis))
+		}
+	})
+
+	app.Command("gcm", "Use GCM pub/sub backend", func(cmd *cli.Cmd) {
+		project := cmd.String(cli.StringOpt{
+			Name:   "project",
+			Value:  "test-project",
+			Desc:   "GCM cloud project",
+			EnvVar: "GOOGLE_CLOUD_PROJECT",
+		})
+		credentials := cmd.String(cli.StringOpt{
+			Name:   "credentials",
+			Value:  "credentials.json",
+			Desc:   "GCM cloud credentials file",
+			EnvVar: "GOOGLE_APPLICATION_CREDENTIALS",
+		})
+		cmd.Action = func() {
+
+			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+			if err != nil {
+				log.Fatalf("failed to listen: %v", err)
+			}
+
+			var opts []grpc.ServerOption
+			grpcServer := grpc.NewServer(opts...)
+			kh := &gcm.GCMHandler{
+				GOOGLE_CLOUD_PROJECT: *project,
+			}
+			if *credentials != "" {
+				os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", *credentials)
+			}
+			log.Printf("Using GCM pub/sub backend")
 			proximo.RegisterMessageSourceServer(grpcServer, &proximo.Server{kh})
 			proximo.RegisterMessageSinkServer(grpcServer, &proximo.Server{kh})
 			log.Fatal(grpcServer.Serve(lis))
