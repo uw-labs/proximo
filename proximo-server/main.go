@@ -8,6 +8,14 @@ import (
 	"strings"
 
 	"github.com/jawher/mow.cli"
+	"github.com/uw-labs/proximo"
+	"github.com/uw-labs/proximo/backends/amqp"
+	"github.com/uw-labs/proximo/backends/gcm"
+	"github.com/uw-labs/proximo/backends/kafka"
+	"github.com/uw-labs/proximo/backends/mem"
+	"github.com/uw-labs/proximo/backends/nats"
+	"github.com/uw-labs/proximo/backends/nats-streaming"
+	"github.com/uw-labs/proximo/backends/nsq"
 	"google.golang.org/grpc"
 )
 
@@ -37,12 +45,12 @@ func main() {
 			}
 			var opts []grpc.ServerOption
 			grpcServer := grpc.NewServer(opts...)
-			kh := &kafkaHandler{
-				brokers: brokers,
+			kh := &kafka.KafkaHandler{
+				Brokers: brokers,
 			}
 			log.Printf("Using kafka at %s\n", brokers)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			proximo.RegisterMessageSourceServer(grpcServer, &proximo.Server{kh})
+			proximo.RegisterMessageSinkServer(grpcServer, &proximo.Server{kh})
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -62,12 +70,12 @@ func main() {
 			}
 			var opts []grpc.ServerOption
 			grpcServer := grpc.NewServer(opts...)
-			kh := &amqpHandler{
-				address: *address,
+			kh := &amqp.AmqpHandler{
+				Address: *address,
 			}
 			log.Printf("Using AMQP at %s\n", *address)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			proximo.RegisterMessageSourceServer(grpcServer, &proximo.Server{kh})
+			proximo.RegisterMessageSinkServer(grpcServer, &proximo.Server{kh})
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -93,13 +101,13 @@ func main() {
 			}
 			var opts []grpc.ServerOption
 			grpcServer := grpc.NewServer(opts...)
-			kh := &natsStreamingHandler{
-				url:       *url,
-				clusterID: *cid,
+			kh := &nats_streaming.NatsStreamingHandler{
+				Url:       *url,
+				ClusterID: *cid,
 			}
 			log.Printf("Using NATS streaming server at %s with cluster id %s\n", *url, *cid)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			proximo.RegisterMessageSourceServer(grpcServer, &proximo.Server{kh})
+			proximo.RegisterMessageSinkServer(grpcServer, &proximo.Server{kh})
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -111,6 +119,35 @@ func main() {
 			Desc:   "NATS url",
 			EnvVar: "PROXIMO_NATS_URL",
 		})
+
+		cmd.Action = func() {
+			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+			if err != nil {
+				log.Fatalf("failed to listen: %v", err)
+			}
+			var opts []grpc.ServerOption
+			grpcServer := grpc.NewServer(opts...)
+			kh := &nats.NatsHandler{
+				Url: *url,
+			}
+			log.Printf("Using NATS at %s\n", *url)
+			proximo.RegisterMessageSourceServer(grpcServer, &proximo.Server{kh})
+			proximo.RegisterMessageSinkServer(grpcServer, &proximo.Server{kh})
+			log.Fatal(grpcServer.Serve(lis))
+		}
+	})
+
+	app.Command("nsq", "Use NSQ backend", func(cmd *cli.Cmd) {
+		lookupdHTTPAddrs := cmd.Strings(cli.StringsOpt{
+			Name:  "lookupaddrs",
+			Value: []string{},
+			Desc:  "NSD lookup HTTP Addrs",
+		})
+		tcpAddress := cmd.Strings(cli.StringsOpt{
+			Name:  "tcpaddress",
+			Value: []string{"localhost:4150"},
+			Desc:  "NSD tcp Addrs",
+		})
 		cmd.Action = func() {
 
 			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
@@ -119,12 +156,49 @@ func main() {
 			}
 			var opts []grpc.ServerOption
 			grpcServer := grpc.NewServer(opts...)
-			kh := &natsHandler{
-				url: *url,
+			kh := &nsq.NSQHandler{
+				Channel:          "teste",
+				LookupdHTTPAddrs: *lookupdHTTPAddrs,
+				NsqdTcpAddress:   *tcpAddress,
 			}
-			log.Printf("Using NATS at %s\n", *url)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			log.Printf("Using nsq  backend")
+			proximo.RegisterMessageSourceServer(grpcServer, &proximo.Server{kh})
+			proximo.RegisterMessageSinkServer(grpcServer, &proximo.Server{kh})
+			log.Fatal(grpcServer.Serve(lis))
+		}
+	})
+
+	app.Command("gcm", "Use GCM pub/sub backend", func(cmd *cli.Cmd) {
+		project := cmd.String(cli.StringOpt{
+			Name:   "project",
+			Value:  "test-project",
+			Desc:   "GCM cloud project",
+			EnvVar: "GOOGLE_CLOUD_PROJECT",
+		})
+		credentials := cmd.String(cli.StringOpt{
+			Name:   "credentials",
+			Value:  "credentials.json",
+			Desc:   "GCM cloud credentials file",
+			EnvVar: "GOOGLE_APPLICATION_CREDENTIALS",
+		})
+		cmd.Action = func() {
+
+			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+			if err != nil {
+				log.Fatalf("failed to listen: %v", err)
+			}
+
+			var opts []grpc.ServerOption
+			grpcServer := grpc.NewServer(opts...)
+			kh := &gcm.GCMHandler{
+				GOOGLE_CLOUD_PROJECT: *project,
+			}
+			if *credentials != "" {
+				os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", *credentials)
+			}
+			log.Printf("Using GCM pub/sub backend")
+			proximo.RegisterMessageSourceServer(grpcServer, &proximo.Server{kh})
+			proximo.RegisterMessageSinkServer(grpcServer, &proximo.Server{kh})
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -138,10 +212,10 @@ func main() {
 			}
 			var opts []grpc.ServerOption
 			grpcServer := grpc.NewServer(opts...)
-			kh := newMemHandler()
+			kh := mem.NewMemHandler()
 			log.Printf("Using in memory testing backend")
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			proximo.RegisterMessageSourceServer(grpcServer, &proximo.Server{kh})
+			proximo.RegisterMessageSinkServer(grpcServer, &proximo.Server{kh})
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})

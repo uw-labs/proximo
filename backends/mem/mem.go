@@ -1,27 +1,29 @@
-package main
+package mem
 
 import (
 	"context"
+
+	"github.com/uw-labs/proximo"
 )
 
-func newMemHandler() *memHandler {
-	mh := &memHandler{
+func NewMemHandler() *MemHandler {
+	mh := &MemHandler{
 		incomingMessages: make(chan *produceReq, 1024),
 		subs:             make(chan *sub, 1024),
-		last100:          make(map[string][]*Message),
+		last100:          make(map[string][]*proximo.Message),
 	}
 	go mh.loop()
 	return mh
 }
 
-type memHandler struct {
+type MemHandler struct {
 	incomingMessages chan *produceReq
 	subs             chan *sub
 
-	last100 map[string][]*Message
+	last100 map[string][]*proximo.Message
 }
 
-func (h *memHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (h *MemHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *proximo.Message, confirmRequest <-chan *proximo.Confirmation) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -37,7 +39,7 @@ func (h *memHandler) HandleConsume(ctx context.Context, consumer, topic string, 
 	}
 }
 
-func (h *memHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (h *MemHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *proximo.Confirmation, messages <-chan *proximo.Message) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -46,7 +48,7 @@ func (h *memHandler) HandleProduce(ctx context.Context, topic string, forClient 
 			select {
 			case h.incomingMessages <- &produceReq{topic, msg}:
 				select {
-				case forClient <- &Confirmation{MsgID: msg.GetId()}:
+				case forClient <- &proximo.Confirmation{MsgID: msg.GetId()}:
 				case <-ctx.Done():
 					return nil
 				}
@@ -58,7 +60,7 @@ func (h *memHandler) HandleProduce(ctx context.Context, topic string, forClient 
 	}
 }
 
-func (h memHandler) loop() {
+func (h MemHandler) loop() {
 	subs := make(map[string]map[string][]*sub)
 
 	for {
@@ -87,7 +89,7 @@ func (h memHandler) loop() {
 						select {
 						case <-sub.ctx.Done():
 							// drop expired consumers
-						case sub.msgs <- &Message{inm.message.GetData(), generateID()}:
+						case sub.msgs <- &proximo.Message{inm.message.GetData(), proximo.GenerateID()}:
 							remaining = append(remaining, sub)
 							sentOne = true
 						}
@@ -97,7 +99,7 @@ func (h memHandler) loop() {
 				}
 			}
 
-			h.last100[inm.topic] = append(h.last100[inm.topic], &Message{inm.message.GetData(), generateID()})
+			h.last100[inm.topic] = append(h.last100[inm.topic], &proximo.Message{inm.message.GetData(), proximo.GenerateID()})
 			for len(h.last100[inm.topic]) > 100 {
 				h.last100[inm.topic] = h.last100[inm.topic][1:]
 			}
@@ -107,12 +109,12 @@ func (h memHandler) loop() {
 
 type produceReq struct {
 	topic   string
-	message *Message
+	message *proximo.Message
 }
 
 type sub struct {
 	topic    string
 	consumer string
-	msgs     chan<- *Message
+	msgs     chan<- *proximo.Message
 	ctx      context.Context
 }

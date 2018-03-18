@@ -26,7 +26,7 @@ This is the Proximo server implementation, written in Go
 
 ## Proximo client libraries
 
-[Go client library](proximoc-go)
+[Go client library](/../../)
 
 [Java client library](proximoc-java)
 

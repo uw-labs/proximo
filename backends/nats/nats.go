@@ -1,18 +1,19 @@
-package main
+package nats
 
 import (
 	"context"
 
 	"github.com/nats-io/nats"
+	"github.com/uw-labs/proximo"
 )
 
-type natsHandler struct {
-	url string
+type NatsHandler struct {
+	Url string
 }
 
-func (h *natsHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (h *NatsHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *proximo.Message, confirmRequest <-chan *proximo.Confirmation) error {
 
-	conn, err := nats.Connect(h.url)
+	conn, err := nats.Connect(h.Url)
 	if err != nil {
 		return err
 	}
@@ -29,9 +30,9 @@ func (h *natsHandler) HandleConsume(ctx context.Context, consumer, topic string,
 		case <-confirmRequest:
 			// drop
 		case m := <-ch:
-			forClient <- &Message{
+			forClient <- &proximo.Message{
 				Data: m.Data,
-				Id:   generateID(),
+				Id:   proximo.GenerateID(),
 			}
 		case <-ctx.Done():
 			return sub.Unsubscribe()
@@ -39,9 +40,9 @@ func (h *natsHandler) HandleConsume(ctx context.Context, consumer, topic string,
 	}
 }
 
-func (h *natsHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (h *NatsHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *proximo.Confirmation, messages <-chan *proximo.Message) error {
 
-	conn, err := nats.Connect(h.url)
+	conn, err := nats.Connect(h.Url)
 	if err != nil {
 		return err
 	}
@@ -54,7 +55,7 @@ func (h *natsHandler) HandleProduce(ctx context.Context, topic string, forClient
 				return err
 			}
 			select {
-			case forClient <- &Confirmation{msg.GetId()}:
+			case forClient <- &proximo.Confirmation{msg.GetId()}:
 			case <-ctx.Done():
 				return nil
 			}
