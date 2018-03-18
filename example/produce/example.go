@@ -4,11 +4,11 @@ import (
 	"context"
 	"log"
 
-	proximoc "github.com/uw-labs/proximo/proximoc-go"
+	"github.com/uw-labs/proximo"
 )
 
 func main() {
-	c, err := proximoc.DialProducer(
+	c, err := proximo.DialProducer(
 		context.Background(),
 		"127.0.0.1:6868",
 		"example-topic", // topic name

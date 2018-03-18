@@ -1,18 +1,19 @@
-package main
+package amqp
 
 import (
 	"context"
 	"strconv"
 
 	"github.com/streadway/amqp"
+	"github.com/uw-labs/proximo"
 )
 
-type amqpHandler struct {
-	address string
+type AmqpHandler struct {
+	Address string
 }
 
-func (h *amqpHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
-	conn, err := amqp.Dial(h.address)
+func (h *AmqpHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *proximo.Message, confirmRequest <-chan *proximo.Confirmation) error {
+	conn, err := amqp.Dial(h.Address)
 	if err != nil {
 		return err
 	}
@@ -89,7 +90,7 @@ func (h *amqpHandler) HandleConsume(ctx context.Context, consumer, topic string,
 	for {
 		select {
 		case msg := <-msgs:
-			message := &Message{Id: strconv.FormatUint(msg.DeliveryTag, 10), Data: msg.Body}
+			message := &proximo.Message{Id: strconv.FormatUint(msg.DeliveryTag, 10), Data: msg.Body}
 			forClient <- message //TODO: can block. fix.
 		case <-ctx.Done():
 			return ch.Close()
@@ -99,6 +100,6 @@ func (h *amqpHandler) HandleConsume(ctx context.Context, consumer, topic string,
 	}
 }
 
-func (h *amqpHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (h *AmqpHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *proximo.Confirmation, messages <-chan *proximo.Message) error {
 	panic("not implemented")
 }
