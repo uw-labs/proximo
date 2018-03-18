@@ -14,6 +14,7 @@ import (
 	"github.com/uw-labs/proximo/backends/mem"
 	"github.com/uw-labs/proximo/backends/nats"
 	"github.com/uw-labs/proximo/backends/nats-streaming"
+	"github.com/uw-labs/proximo/backends/nsq"
 	"google.golang.org/grpc"
 )
 
@@ -117,8 +118,8 @@ func main() {
 			Desc:   "NATS url",
 			EnvVar: "PROXIMO_NATS_URL",
 		})
-		cmd.Action = func() {
 
+		cmd.Action = func() {
 			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 			if err != nil {
 				log.Fatalf("failed to listen: %v", err)
@@ -129,6 +130,37 @@ func main() {
 				Url: *url,
 			}
 			log.Printf("Using NATS at %s\n", *url)
+			proximo.RegisterMessageSourceServer(grpcServer, &proximo.Server{kh})
+			proximo.RegisterMessageSinkServer(grpcServer, &proximo.Server{kh})
+			log.Fatal(grpcServer.Serve(lis))
+		}
+	})
+
+	app.Command("nsq", "Use NSQ backend", func(cmd *cli.Cmd) {
+		lookupdHTTPAddrs := cmd.Strings(cli.StringsOpt{
+			Name:  "lookupaddrs",
+			Value: []string{},
+			Desc:  "NSD lookup HTTP Addrs",
+		})
+		tcpAddress := cmd.Strings(cli.StringsOpt{
+			Name:  "tcpaddress",
+			Value: []string{"localhost:4150"},
+			Desc:  "NSD tcp Addrs",
+		})
+		cmd.Action = func() {
+
+			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+			if err != nil {
+				log.Fatalf("failed to listen: %v", err)
+			}
+			var opts []grpc.ServerOption
+			grpcServer := grpc.NewServer(opts...)
+			kh := &nsq.NSQHandler{
+				Channel:          "teste",
+				LookupdHTTPAddrs: *lookupdHTTPAddrs,
+				NsqdTcpAddress:   *tcpAddress,
+			}
+			log.Printf("Using nsq  backend")
 			proximo.RegisterMessageSourceServer(grpcServer, &proximo.Server{kh})
 			proximo.RegisterMessageSinkServer(grpcServer, &proximo.Server{kh})
 			log.Fatal(grpcServer.Serve(lis))
