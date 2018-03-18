@@ -1,4 +1,4 @@
-package proximoc
+package proximo
 
 import (
 	"context"

@@ -1,4 +1,4 @@
-package main
+package kafka
 
 import (
 	"context"
@@ -10,14 +10,15 @@ import (
 
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
+	"github.com/uw-labs/proximo"
 	"google.golang.org/grpc/grpclog"
 )
 
-type kafkaHandler struct {
-	brokers []string
+type KafkaHandler struct {
+	Brokers []string
 }
 
-func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (h *KafkaHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *proximo.Message, confirmRequest <-chan *proximo.Confirmation) error {
 	toConfirmIds := make(chan string)
 
 	errors := make(chan error)
@@ -28,7 +29,7 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string
 	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	config.Metadata.RefreshFrequency = 30 * time.Second
 
-	c, err := cluster.NewConsumer(h.brokers, consumer, []string{topic}, config)
+	c, err := cluster.NewConsumer(h.Brokers, consumer, []string{topic}, config)
 	if err != nil {
 		return err
 	}
@@ -59,7 +60,7 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string
 	}
 }
 
-func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClient chan<- *Message, toConfirmID chan string, topic, consumer string) error {
+func (h *KafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClient chan<- *proximo.Message, toConfirmID chan string, topic, consumer string) error {
 
 	grpclog.Println("started consume loop")
 	defer grpclog.Println("exited consume loop")
@@ -72,7 +73,7 @@ func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClie
 			}
 			confirmID := fmt.Sprintf("%d-%d", msg.Offset, msg.Partition)
 			select {
-			case forClient <- &Message{Data: msg.Value, Id: confirmID}:
+			case forClient <- &proximo.Message{Data: msg.Value, Id: confirmID}:
 			case <-ctx.Done():
 				grpclog.Println("context is done")
 				return c.Close()
@@ -93,11 +94,11 @@ func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClie
 	}
 }
 
-func (h *kafkaHandler) confirm(ctx context.Context, c *cluster.Consumer, id string, toConfirmID chan string, topic string) error {
+func (h *KafkaHandler) confirm(ctx context.Context, c *cluster.Consumer, id string, toConfirmID chan string, topic string) error {
 	select {
 	case cid := <-toConfirmID:
 		if cid != id {
-			return errInvalidConfirm
+			return proximo.ErrInvalidConfirm
 		}
 		spl := strings.Split(cid, "-")
 		o, err := strconv.ParseInt(spl[0], 10, 64)
@@ -114,11 +115,11 @@ func (h *kafkaHandler) confirm(ctx context.Context, c *cluster.Consumer, id stri
 	return nil
 }
 
-func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (h *KafkaHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *proximo.Confirmation, messages <-chan *proximo.Message) error {
 	conf := sarama.NewConfig()
 	conf.Producer.Return.Successes = true
 
-	sp, err := sarama.NewSyncProducer(h.brokers, conf)
+	sp, err := sarama.NewSyncProducer(h.Brokers, conf)
 	if err != nil {
 		return err
 	}
@@ -137,7 +138,7 @@ func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClien
 			if err != nil {
 				return err
 			}
-			forClient <- &Confirmation{MsgID: m.GetId()}
+			forClient <- &proximo.Confirmation{MsgID: m.GetId()}
 		case <-ctx.Done():
 			return nil
 		}

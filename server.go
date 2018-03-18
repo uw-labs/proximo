@@ -1,4 +1,4 @@
-package main
+package proximo
 
 import (
 	"context"
@@ -8,22 +8,22 @@ import (
 )
 
 var (
-	errStartedTwice   = errors.New("consumption already started")
-	errInvalidConfirm = errors.New("invalid confirmation")
-	errNotConnected   = errors.New("not connected to a topic")
-	errInvalidRequest = errors.New("invalid consumer request - this is possibly a bug in your client library")
+	ErrStartedTwice   = errors.New("consumption already started")
+	ErrInvalidConfirm = errors.New("invalid confirmation")
+	ErrNotConnected   = errors.New("not connected to a topic")
+	ErrInvalidRequest = errors.New("invalid consumer request - this is possibly a bug in your client library")
 )
 
-type handler interface {
+type Handler interface {
 	HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error
 	HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error
 }
 
-type server struct {
-	handler handler
+type Server struct {
+	Handler Handler
 }
 
-func (s *server) Consume(stream MessageSource_ConsumeServer) error {
+func (s *Server) Consume(stream MessageSource_ConsumeServer) error {
 
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
@@ -49,19 +49,19 @@ func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 			switch {
 			case msg.GetStartRequest() != nil:
 				if started {
-					errors <- errStartedTwice
+					errors <- ErrStartedTwice
 					return
 				}
 				startRequest <- msg.GetStartRequest()
 				started = true
 			case msg.GetConfirmation() != nil:
 				if !started {
-					errors <- errInvalidConfirm
+					errors <- ErrInvalidConfirm
 					return
 				}
 				confirmRequest <- msg.GetConfirmation()
 			default:
-				errors <- errInvalidRequest
+				errors <- ErrInvalidRequest
 				return
 			}
 		}
@@ -99,7 +99,7 @@ func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 	}()
 
 	go func() {
-		err := s.handler.HandleConsume(ctx, consumer, topic, forClient, confirmRequest)
+		err := s.Handler.HandleConsume(ctx, consumer, topic, forClient, confirmRequest)
 		if err != nil {
 			errors <- err
 		}
@@ -114,7 +114,7 @@ func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 
 }
 
-func (s *server) Publish(stream MessageSink_PublishServer) error {
+func (s *Server) Publish(stream MessageSink_PublishServer) error {
 
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
@@ -140,14 +140,14 @@ func (s *server) Publish(stream MessageSink_PublishServer) error {
 			switch {
 			case msg.GetStartRequest() != nil:
 				if started {
-					errors <- errStartedTwice
+					errors <- ErrStartedTwice
 					return
 				}
 				startRequest <- msg.GetStartRequest()
 				started = true
 			case msg.GetMsg() != nil:
 				if !started {
-					errors <- errNotConnected
+					errors <- ErrNotConnected
 					return
 				}
 				messages <- msg.GetMsg()
@@ -178,7 +178,7 @@ func (s *server) Publish(stream MessageSink_PublishServer) error {
 	}()
 
 	go func() {
-		err := s.handler.HandleProduce(ctx, topic, forClient, messages)
+		err := s.Handler.HandleProduce(ctx, topic, forClient, messages)
 		if err != nil {
 			errors <- err
 		}

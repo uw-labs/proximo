@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/urfave/cli"
-	proximoc "github.com/uw-labs/proximo/proximoc-go"
+	"github.com/uw-labs/proximo"
 )
 
 func main() {
@@ -49,12 +49,12 @@ func main() {
 }
 
 func consume(endpoint string, topic string, consumerid string) error {
-	if err := proximoc.ConsumeContext(
+	if err := proximo.ConsumeContext(
 		context.Background(),
 		endpoint,
 		consumerid,
 		topic,
-		func(m *proximoc.Message) error {
+		func(m *proximo.Message) error {
 			fmt.Printf("%s", m.GetData())
 			return nil
 		}); err != nil {
@@ -64,7 +64,7 @@ func consume(endpoint string, topic string, consumerid string) error {
 }
 
 func produce(endpoint string, topic string) error {
-	c, err := proximoc.DialProducer(
+	c, err := proximo.DialProducer(
 		context.Background(),
 		endpoint,
 		topic,

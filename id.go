@@ -1,11 +1,11 @@
-package main
+package proximo
 
 import (
 	"crypto/rand"
 	"encoding/hex"
 )
 
-func generateID() string {
+func GenerateID() string {
 	random := []byte{0, 0, 0, 0, 0, 0, 0, 0}
 	_, err := rand.Read(random)
 	if err != nil {

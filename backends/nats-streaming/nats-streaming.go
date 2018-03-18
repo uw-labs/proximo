@@ -1,4 +1,4 @@
-package main
+package nats_streaming
 
 import (
 	"context"
@@ -9,16 +9,17 @@ import (
 
 	"github.com/nats-io/go-nats-streaming"
 	"github.com/nats-io/go-nats-streaming/pb"
+	"github.com/uw-labs/proximo"
 )
 
-type natsStreamingHandler struct {
-	url       string
-	clusterID string
+type NatsStreamingHandler struct {
+	Url       string
+	ClusterID string
 }
 
-func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (h *NatsStreamingHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *proximo.Message, confirmRequest <-chan *proximo.Confirmation) error {
 
-	conn, err := stan.Connect(h.clusterID, consumer+generateID(), stan.NatsURL(h.url))
+	conn, err := stan.Connect(h.ClusterID, consumer+proximo.GenerateID(), stan.NatsURL(h.Url))
 	if err != nil {
 		return err
 	}
@@ -64,7 +65,7 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 		select {
 		case <-ctx.Done():
 			return
-		case forClient <- &Message{Data: msg.Data, Id: strconv.FormatUint(msg.Sequence, 10)}:
+		case forClient <- &proximo.Message{Data: msg.Data, Id: strconv.FormatUint(msg.Sequence, 10)}:
 			ackQueue <- msg
 		}
 	}
@@ -94,9 +95,9 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 
 }
 
-func (h *natsStreamingHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (h *NatsStreamingHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *proximo.Confirmation, messages <-chan *proximo.Message) error {
 
-	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsURL(h.url))
+	conn, err := stan.Connect(h.ClusterID, proximo.GenerateID(), stan.NatsURL(h.Url))
 	if err != nil {
 		return err
 	}
@@ -111,7 +112,7 @@ func (h *natsStreamingHandler) HandleProduce(ctx context.Context, topic string, 
 				return err
 			}
 			select {
-			case forClient <- &Confirmation{MsgID: msg.GetId()}:
+			case forClient <- &proximo.Confirmation{MsgID: msg.GetId()}:
 			case <-ctx.Done():
 				return conn.Close()
 			}
