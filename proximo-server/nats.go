@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/nats-io/nats"
+	"github.com/pkg/errors"
 )
 
 type natsHandler struct {
@@ -11,7 +12,6 @@ type natsHandler struct {
 }
 
 func (h *natsHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
-
 	conn, err := nats.Connect(h.url)
 	if err != nil {
 		return err
@@ -40,11 +40,11 @@ func (h *natsHandler) HandleConsume(ctx context.Context, consumer, topic string,
 }
 
 func (h *natsHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
-
 	conn, err := nats.Connect(h.url)
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	for {
 		select {
@@ -62,4 +62,16 @@ func (h *natsHandler) HandleProduce(ctx context.Context, topic string, forClient
 			return nil
 		}
 	}
+}
+
+func (h *natsHandler) Status() (bool, error) {
+	conn, err := nats.Connect(h.url)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to connect to %s", h.url)
+	}
+	defer conn.Close()
+	if conn.Status() == nats.CONNECTED {
+		return false, errors.New("expected connected status")
+	}
+	return true, nil
 }

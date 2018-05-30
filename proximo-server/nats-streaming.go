@@ -7,8 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nats-io/go-nats"
 	"github.com/nats-io/go-nats-streaming"
 	"github.com/nats-io/go-nats-streaming/pb"
+	"github.com/pkg/errors"
 )
 
 type natsStreamingHandler struct {
@@ -17,7 +19,6 @@ type natsStreamingHandler struct {
 }
 
 func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
-
 	conn, err := stan.Connect(h.clusterID, consumer+generateID(), stan.NatsURL(h.url))
 	if err != nil {
 		return err
@@ -95,11 +96,11 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 }
 
 func (h *natsStreamingHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
-
 	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsURL(h.url))
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	for {
 		select {
@@ -117,5 +118,16 @@ func (h *natsStreamingHandler) HandleProduce(ctx context.Context, topic string, 
 			}
 		}
 	}
+}
 
+func (h *natsStreamingHandler) Status() (bool, error) {
+	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsURL(h.url))
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to connect to %s", h.url)
+	}
+	defer conn.Close()
+	if conn.NatsConn().Status() != nats.CONNECTED {
+		return false, errors.New("connection status different than CONNECTED")
+	}
+	return true, nil
 }
