@@ -2,19 +2,21 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Shopify/sarama"
-	cluster "github.com/bsm/sarama-cluster"
+	"github.com/bsm/sarama-cluster"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc/grpclog"
 )
 
 type kafkaHandler struct {
-	brokers []string
+	brokers  []string
+	counters counters
 }
 
 func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
@@ -51,6 +53,7 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string
 			if err != nil {
 				return err
 			}
+			h.counters.SourcedMessagesCounter.WithLabelValues(topic).Inc()
 		case <-ctx.Done():
 			return nil
 		case err := <-errors:
@@ -117,6 +120,10 @@ func (h *kafkaHandler) confirm(ctx context.Context, c *cluster.Consumer, id stri
 func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
 	conf := sarama.NewConfig()
 	conf.Producer.Return.Successes = true
+	conf.Producer.RequiredAcks = sarama.WaitForAll
+	conf.Producer.Return.Errors = true
+	conf.Producer.Retry.Max = 3
+	conf.Producer.Timeout = time.Duration(60) * time.Second
 
 	sp, err := sarama.NewSyncProducer(h.brokers, conf)
 	if err != nil {
@@ -137,9 +144,42 @@ func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClien
 			if err != nil {
 				return err
 			}
+			h.counters.SinkMessagesCounter.WithLabelValues(topic).Inc()
 			forClient <- &Confirmation{MsgID: m.GetId()}
 		case <-ctx.Done():
 			return nil
 		}
 	}
+}
+
+func (h *kafkaHandler) Status() (bool, error) {
+	errs := make(chan error)
+
+	for _, broker := range h.brokers {
+		go func(broker string) {
+			conn, err := net.DialTimeout("tcp", broker, 10*time.Second)
+			if err != nil {
+				errs <- fmt.Errorf("Failed to connect to broker %s: %v", broker, err)
+				return
+			}
+			if err = conn.Close(); err != nil {
+				errs <- fmt.Errorf("Failed to close connection to broker %s: %v", broker, err)
+				return
+			}
+			errs <- nil
+		}(broker)
+	}
+
+	e := []error{}
+	for range h.brokers {
+		err := <-errs
+		if err != nil {
+			e = append(e, err)
+		}
+	}
+	if len(e) == 0 {
+		return true, nil
+	}
+	return false, errors.Errorf("Series of errors: %v", e)
+
 }
