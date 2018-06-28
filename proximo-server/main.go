@@ -20,6 +20,11 @@ func main() {
 		Desc:   "Port to listen on",
 		EnvVar: "PROXIMO_PORT",
 	})
+	topicMap := app.Strings(cli.StringsOpt{
+		Name:   "topic-map",
+		Desc:   "map one topic to another",
+		EnvVar: "PROXIMO_TOPIC_MAP",
+	})
 
 	app.Command("kafka", "Use kafka backend", func(cmd *cli.Cmd) {
 		brokerString := cmd.String(cli.StringOpt{
@@ -35,14 +40,15 @@ func main() {
 			if err != nil {
 				log.Fatalf("failed to listen: %v", err)
 			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
-			kh := &kafkaHandler{
+
+			grpcServer := grpc.NewServer()
+			s := newServer(&kafkaHandler{
 				brokers: brokers,
-			}
+			}, *topicMap)
+
 			log.Printf("Using kafka at %s\n", brokers)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			RegisterMessageSourceServer(grpcServer, s)
+			RegisterMessageSinkServer(grpcServer, s)
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -55,19 +61,19 @@ func main() {
 			EnvVar: "PROXIMO_AMQP_ADDRESS",
 		})
 		cmd.Action = func() {
-
 			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 			if err != nil {
 				log.Fatalf("failed to listen: %v", err)
 			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
-			kh := &amqpHandler{
+
+			grpcServer := grpc.NewServer()
+			s := newServer(&amqpHandler{
 				address: *address,
-			}
+			}, *topicMap)
+
 			log.Printf("Using AMQP at %s\n", *address)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			RegisterMessageSourceServer(grpcServer, s)
+			RegisterMessageSinkServer(grpcServer, s)
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -86,20 +92,20 @@ func main() {
 			EnvVar: "PROXIMO_NATS_CLUSTER_ID",
 		})
 		cmd.Action = func() {
-
 			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 			if err != nil {
 				log.Fatalf("failed to listen: %v", err)
 			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
-			kh := &natsStreamingHandler{
+
+			grpcServer := grpc.NewServer()
+			s := newServer(&natsStreamingHandler{
 				url:       *url,
 				clusterID: *cid,
-			}
+			}, *topicMap)
+
 			log.Printf("Using NATS streaming server at %s with cluster id %s\n", *url, *cid)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			RegisterMessageSourceServer(grpcServer, s)
+			RegisterMessageSinkServer(grpcServer, s)
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -117,14 +123,15 @@ func main() {
 			if err != nil {
 				log.Fatalf("failed to listen: %v", err)
 			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
-			kh := &natsHandler{
+
+			grpcServer := grpc.NewServer()
+			s := newServer(&natsHandler{
 				url: *url,
-			}
+			}, *topicMap)
+
 			log.Printf("Using NATS at %s\n", *url)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			RegisterMessageSourceServer(grpcServer, s)
+			RegisterMessageSinkServer(grpcServer, s)
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -136,12 +143,13 @@ func main() {
 			if err != nil {
 				log.Fatalf("failed to listen: %v", err)
 			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
-			kh := newMemHandler()
+
+			grpcServer := grpc.NewServer()
+			s := newServer(newMemHandler(), *topicMap)
+
 			log.Printf("Using in memory testing backend")
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			RegisterMessageSourceServer(grpcServer, s)
+			RegisterMessageSinkServer(grpcServer, s)
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})

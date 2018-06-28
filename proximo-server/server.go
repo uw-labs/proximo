@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log"
 	"strings"
 )
 
@@ -20,7 +21,24 @@ type handler interface {
 }
 
 type server struct {
-	handler handler
+	handler  handler
+	topicMap map[string]string
+}
+
+func newServer(h handler, topicMappings []string) *server {
+	topicMap := make(map[string]string)
+	for _, mapping := range topicMappings {
+		mappingParts := strings.Split(mapping, ":")
+		if len(mappingParts) == 2 {
+			log.Printf("Mapping topic `%s` to `%s`", mappingParts[0], mappingParts[1])
+			topicMap[mappingParts[0]] = mappingParts[1]
+		}
+	}
+
+	return &server{
+		handler:  h,
+		topicMap: topicMap,
+	}
 }
 
 func (s *server) Consume(stream MessageSource_ConsumeServer) error {
@@ -76,6 +94,10 @@ func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 		consumer = sr.GetConsumer()
 	case <-ctx.Done():
 		return nil //ctx.Err()
+	}
+
+	if mappedTopic, ok := s.topicMap[topic]; ok {
+		topic = mappedTopic
 	}
 
 	forClient := make(chan *Message)
@@ -162,6 +184,10 @@ func (s *server) Publish(stream MessageSink_PublishServer) error {
 		topic = sr.GetTopic()
 	case <-ctx.Done():
 		return nil //ctx.Err()
+	}
+
+	if mappedTopic, ok := s.topicMap[topic]; ok {
+		topic = mappedTopic
 	}
 
 	forClient := make(chan *Confirmation)
