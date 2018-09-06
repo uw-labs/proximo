@@ -6,9 +6,11 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/jawher/mow.cli"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 func main() {
@@ -136,7 +138,11 @@ func main() {
 			if err != nil {
 				log.Fatalf("failed to listen: %v", err)
 			}
-			var opts []grpc.ServerOption
+			opts := []grpc.ServerOption{
+				grpc.KeepaliveParams(keepalive.ServerParameters{
+					Time: 5 * time.Minute,
+				}),
+			}
 			grpcServer := grpc.NewServer(opts...)
 			kh := newMemHandler()
 			log.Printf("Using in memory testing backend")
