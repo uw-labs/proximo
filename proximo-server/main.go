@@ -104,31 +104,6 @@ func main() {
 		}
 	})
 
-	app.Command("nats", "Use NATS backend", func(cmd *cli.Cmd) {
-		url := cmd.String(cli.StringOpt{
-			Name:   "url",
-			Value:  "nats://localhost:4222",
-			Desc:   "NATS url",
-			EnvVar: "PROXIMO_NATS_URL",
-		})
-		cmd.Action = func() {
-
-			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-			if err != nil {
-				log.Fatalf("failed to listen: %v", err)
-			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
-			kh := &natsHandler{
-				url: *url,
-			}
-			log.Printf("Using NATS at %s\n", *url)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
-			log.Fatal(grpcServer.Serve(lis))
-		}
-	})
-
 	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
 		cmd.Action = func() {
 
