@@ -41,11 +41,11 @@ func (h *amqpHandler) HandleConsume(ctx context.Context, consumer, topic string,
 	// ensure queue exists and create if needed
 	q, err := ch.QueueDeclare(
 		topic+":"+consumer, // name
-		true,  // durable
-		false, // delete when usused
-		false, // exclusive
-		false, // no-wait
-		nil,   // arguments
+		true,               // durable
+		false,              // delete when usused
+		false,              // exclusive
+		false,              // no-wait
+		nil,                // arguments
 	)
 	if err != nil {
 		return err
