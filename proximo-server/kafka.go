@@ -117,6 +117,10 @@ func (h *kafkaHandler) confirm(ctx context.Context, c *cluster.Consumer, id stri
 func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
 	conf := sarama.NewConfig()
 	conf.Producer.Return.Successes = true
+	conf.Producer.RequiredAcks = sarama.WaitForAll
+	conf.Producer.Return.Errors = true
+	conf.Producer.Retry.Max = 3
+	conf.Producer.Timeout = time.Duration(60) * time.Second
 
 	sp, err := sarama.NewSyncProducer(h.brokers, conf)
 	if err != nil {
