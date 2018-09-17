@@ -114,7 +114,19 @@ func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 
 }
 
+// messageSink_PublishServer is a subset of the auto-generated
+// MessageSink_PublishServer interface and makes things easier in tests.
+type messageSink_PublishServer interface {
+	Send(*Confirmation) error
+	Recv() (*PublisherRequest, error)
+	Context() context.Context
+}
+
 func (s *server) Publish(stream MessageSink_PublishServer) error {
+	return s.publish(stream)
+}
+
+func (s *server) publish(stream messageSink_PublishServer) error {
 
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
@@ -165,7 +177,6 @@ func (s *server) Publish(stream MessageSink_PublishServer) error {
 	}
 
 	forClient := make(chan *Confirmation)
-	defer close(forClient)
 
 	go func() {
 		for m := range forClient {
@@ -178,6 +189,7 @@ func (s *server) Publish(stream MessageSink_PublishServer) error {
 	}()
 
 	go func() {
+		defer close(forClient)
 		err := s.handler.HandleProduce(ctx, topic, forClient, messages)
 		if err != nil {
 			errors <- err
