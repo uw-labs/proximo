@@ -25,6 +25,9 @@ func ConsumeContextTLS(ctx context.Context, proximoAddress string, consumer stri
 
 func consumeContext(ctx context.Context, proximoAddress string, consumer string, topic string, f func(*Message) error, opts ...grpc.DialOption) error {
 
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	conn, err := grpc.DialContext(ctx, proximoAddress, opts...)
 	if err != nil {
 		grpclog.Fatalf("fail to dial: %v", err)
@@ -41,9 +44,6 @@ func consumeContext(ctx context.Context, proximoAddress string, consumer string,
 
 	handled := make(chan string)
 	errs := make(chan error, 2)
-
-	var wg sync.WaitGroup
-	defer wg.Wait()
 
 	ins := make(chan *Message, 16) // TODO: make buffer size configurable?
 
