@@ -9,7 +9,8 @@ message Message {
 
 // Consumer types
 service MessageSource {
-	rpc Consume(stream ConsumerRequest) returns (stream Message) {}
+  rpc Consume(stream ConsumerRequest) returns (stream Message) {
+  }
 }
 
 message ConsumerRequest {
@@ -30,7 +31,8 @@ message Confirmation {
 
 // Producer types
 service MessageSink {
-	rpc Publish(stream PublisherRequest) returns (stream Confirmation) {}
+  rpc Publish(stream PublisherRequest) returns (stream Confirmation) {
+  }
 }
 
 message PublisherRequest {
