@@ -23,6 +23,13 @@ message ConsumerRequest {
 message StartConsumeRequest {
   string topic = 1;
   string consumer = 2;
+  Offset initial_offset = 3;
+}
+
+enum Offset {
+  OFFSET_DEFAULT = 0;
+  OFFSET_NEWEST = 1;
+  OFFSET_OLDEST = 2;
 }
 
 message Confirmation {
