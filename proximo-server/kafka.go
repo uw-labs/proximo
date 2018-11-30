@@ -17,7 +17,7 @@ type kafkaHandler struct {
 	brokers []string
 }
 
-func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (h *kafkaHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
 	toConfirmIds := make(chan string)
 
 	errors := make(chan error)
@@ -28,7 +28,7 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string
 	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	config.Metadata.RefreshFrequency = 30 * time.Second
 
-	c, err := cluster.NewConsumer(h.brokers, consumer, []string{topic}, config)
+	c, err := cluster.NewConsumer(h.brokers, conf.consumer, []string{conf.topic}, config)
 	if err != nil {
 		return err
 	}
@@ -38,7 +38,7 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string
 	}()
 
 	go func() {
-		err := h.consume(ctx, c, forClient, toConfirmIds, topic, consumer)
+		err := h.consume(ctx, c, forClient, toConfirmIds, conf.topic, conf.consumer)
 		if err != nil {
 			errors <- err
 		}
@@ -46,8 +46,8 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, consumer, topic string
 
 	for {
 		select {
-		case conf := <-confirmRequest:
-			err := h.confirm(ctx, c, conf.GetMsgID(), toConfirmIds, topic)
+		case cr := <-confirmRequest:
+			err := h.confirm(ctx, c, cr.GetMsgID(), toConfirmIds, conf.topic)
 			if err != nil {
 				return err
 			}
@@ -114,7 +114,7 @@ func (h *kafkaHandler) confirm(ctx context.Context, c *cluster.Consumer, id stri
 	return nil
 }
 
-func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (h *kafkaHandler) HandleProduce(ctx context.Context, cfg producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
 	conf := sarama.NewConfig()
 	conf.Producer.Return.Successes = true
 	conf.Producer.RequiredAcks = sarama.WaitForAll
@@ -132,7 +132,7 @@ func (h *kafkaHandler) HandleProduce(ctx context.Context, topic string, forClien
 		select {
 		case m := <-messages:
 			pm := &sarama.ProducerMessage{
-				Topic: topic,
+				Topic: cfg.topic,
 				Value: sarama.ByteEncoder(m.GetData()),
 				// Key = TODO:
 			}

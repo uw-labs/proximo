@@ -16,9 +16,9 @@ type natsStreamingHandler struct {
 	clusterID string
 }
 
-func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (h *natsStreamingHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
 
-	conn, err := stan.Connect(h.clusterID, consumer+generateID(), stan.NatsURL(h.url))
+	conn, err := stan.Connect(h.clusterID, conf.consumer+generateID(), stan.NatsURL(h.url))
 	if err != nil {
 		return err
 	}
@@ -70,11 +70,11 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 	}
 
 	_, err = conn.QueueSubscribe(
-		topic,
-		consumer,
+		conf.topic,
+		conf.consumer,
 		f,
 		stan.StartAt(pb.StartPosition_First),
-		stan.DurableName(consumer),
+		stan.DurableName(conf.consumer),
 		stan.SetManualAckMode(),
 		stan.AckWait(60*time.Second),
 	)
@@ -94,7 +94,7 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, consumer, topi
 
 }
 
-func (h *natsStreamingHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (h *natsStreamingHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
 
 	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsURL(h.url))
 	if err != nil {
@@ -106,7 +106,7 @@ func (h *natsStreamingHandler) HandleProduce(ctx context.Context, topic string, 
 		case <-ctx.Done():
 			return conn.Close()
 		case msg := <-messages:
-			err := conn.Publish(topic, msg.GetData())
+			err := conn.Publish(conf.topic, msg.GetData())
 			if err != nil {
 				return err
 			}
