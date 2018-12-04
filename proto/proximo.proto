@@ -9,7 +9,8 @@ message Message {
 
 // Consumer types
 service MessageSource {
-	rpc Consume(stream ConsumerRequest) returns (stream Message) {}
+  rpc Consume(stream ConsumerRequest) returns (stream Message) {
+  }
 }
 
 message ConsumerRequest {
@@ -22,6 +23,13 @@ message ConsumerRequest {
 message StartConsumeRequest {
   string topic = 1;
   string consumer = 2;
+  Offset initial_offset = 3;
+}
+
+enum Offset {
+  OFFSET_DEFAULT = 0;
+  OFFSET_NEWEST = 1;
+  OFFSET_OLDEST = 2;
 }
 
 message Confirmation {
@@ -30,7 +38,8 @@ message Confirmation {
 
 // Producer types
 service MessageSink {
-	rpc Publish(stream PublisherRequest) returns (stream Confirmation) {}
+  rpc Publish(stream PublisherRequest) returns (stream Confirmation) {
+  }
 }
 
 message PublisherRequest {
