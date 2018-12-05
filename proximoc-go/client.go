@@ -175,7 +175,13 @@ type ProducerConn struct {
 func (p *ProducerConn) Produce(message []byte) error {
 	err := make(chan error)
 	r := req{message, err}
-	p.reqs <- r
+	select {
+	case p.reqs <- r:
+	case e := <-p.errs:
+		return e
+	case <-p.ctx.Done():
+		return p.ctx.Err()
+	}
 	var e error
 	select {
 	case e = <-err:
