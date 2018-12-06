@@ -23,6 +23,13 @@ func main() {
 		EnvVar: "PROXIMO_PORT",
 	})
 
+	endpoints := app.String(cli.StringOpt{
+		Name:   "endpoints",
+		Value:  "consume,publish",
+		Desc:   "The proximo endpoints to expose (consume, publish)",
+		EnvVar: "PROXIMO_ENDPOINTS",
+	})
+
 	app.Command("kafka", "Use kafka backend", func(cmd *cli.Cmd) {
 		brokerString := cmd.String(cli.StringOpt{
 			Name:   "brokers",
@@ -43,8 +50,7 @@ func main() {
 				brokers: brokers,
 			}
 			log.Printf("Using kafka at %s\n", brokers)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			registerGRPCServers(grpcServer, &server{kh}, *endpoints)
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -68,8 +74,7 @@ func main() {
 				address: *address,
 			}
 			log.Printf("Using AMQP at %s\n", *address)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			registerGRPCServers(grpcServer, &server{kh}, *endpoints)
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -100,8 +105,7 @@ func main() {
 				clusterID: *cid,
 			}
 			log.Printf("Using NATS streaming server at %s with cluster id %s\n", *url, *cid)
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			registerGRPCServers(grpcServer, &server{kh}, *endpoints)
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
@@ -121,11 +125,23 @@ func main() {
 			grpcServer := grpc.NewServer(opts...)
 			kh := newMemHandler()
 			log.Printf("Using in memory testing backend")
-			RegisterMessageSourceServer(grpcServer, &server{kh})
-			RegisterMessageSinkServer(grpcServer, &server{kh})
+			registerGRPCServers(grpcServer, &server{kh}, *endpoints)
 			log.Fatal(grpcServer.Serve(lis))
 		}
 	})
 
 	log.Fatal(app.Run(os.Args))
+}
+
+func registerGRPCServers(grpcServer *grpc.Server, proximoServer *server, endpoints string) {
+	for _, endpoint := range strings.Split(endpoints, ",") {
+		switch endpoint {
+		case "consume":
+			RegisterMessageSourceServer(grpcServer, proximoServer)
+		case "publish":
+			RegisterMessageSinkServer(grpcServer, proximoServer)
+		default:
+			log.Fatalf("invalid expose-endpoint flag: %s", endpoint)
+		}
+	}
 }
