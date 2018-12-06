@@ -21,11 +21,11 @@ type memHandler struct {
 	last100 map[string][]*Message
 }
 
-func (h *memHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (h *memHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	h.subs <- &sub{topic, consumer, forClient, ctx}
+	h.subs <- &sub{conf.topic, conf.consumer, forClient, ctx}
 
 	for {
 		select {
@@ -37,14 +37,14 @@ func (h *memHandler) HandleConsume(ctx context.Context, consumer, topic string, 
 	}
 }
 
-func (h *memHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (h *memHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case msg := <-messages:
 			select {
-			case h.incomingMessages <- &produceReq{topic, msg}:
+			case h.incomingMessages <- &produceReq{conf.topic, msg}:
 				select {
 				case forClient <- &Confirmation{MsgID: msg.GetId()}:
 				case <-ctx.Done():

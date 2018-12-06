@@ -87,11 +87,11 @@ type mockProduceHandler struct {
 	releaseOne chan struct{}
 }
 
-func (mh *mockProduceHandler) HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (mh *mockProduceHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
 	panic("this mock does not handle consume")
 }
 
-func (mh *mockProduceHandler) HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (mh *mockProduceHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
 
 	go mh.loop(forClient, messages)
 

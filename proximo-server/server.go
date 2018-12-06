@@ -14,9 +14,18 @@ var (
 	errInvalidRequest = errors.New("invalid consumer request - this is possibly a bug in your client library")
 )
 
+type consumerConfig struct {
+	consumer string
+	topic    string
+}
+
+type producerConfig struct {
+	topic string
+}
+
 type handler interface {
-	HandleConsume(ctx context.Context, consumer, topic string, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error
-	HandleProduce(ctx context.Context, topic string, forClient chan<- *Confirmation, messages <-chan *Message) error
+	HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error
+	HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error
 }
 
 type server struct {
@@ -99,7 +108,11 @@ func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 	}()
 
 	go func() {
-		err := s.handler.HandleConsume(ctx, consumer, topic, forClient, confirmRequest)
+		conf := consumerConfig{
+			consumer: consumer,
+			topic:    topic,
+		}
+		err := s.handler.HandleConsume(ctx, conf, forClient, confirmRequest)
 		if err != nil {
 			errors <- err
 		}
@@ -190,7 +203,10 @@ func (s *server) publish(stream messageSink_PublishServer) error {
 
 	go func() {
 		defer close(forClient)
-		err := s.handler.HandleProduce(ctx, topic, forClient, messages)
+		conf := producerConfig{
+			topic: topic,
+		}
+		err := s.handler.HandleProduce(ctx, conf, forClient, messages)
 		if err != nil {
 			errors <- err
 		}
