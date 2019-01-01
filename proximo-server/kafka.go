@@ -44,13 +44,23 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, conf consumerConfig, f
 		}
 	}()
 
+	var toConfirm []string
 	for {
 		select {
+		case tc := <-toConfirmIds:
+			toConfirm = append(toConfirm, tc)
 		case cr := <-confirmRequest:
-			err := h.confirm(ctx, c, cr.GetMsgID(), toConfirmIds, conf.topic)
+			if len(toConfirm) < 1 {
+				return errInvalidConfirm
+			}
+			if toConfirm[0] != cr.GetMsgID() {
+				return errInvalidConfirm
+			}
+			err := h.confirm(ctx, c, cr.GetMsgID(), conf.topic)
 			if err != nil {
 				return err
 			}
+			toConfirm = toConfirm[1:]
 		case <-ctx.Done():
 			return nil
 		case err := <-errors:
@@ -72,13 +82,13 @@ func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClie
 			}
 			confirmID := fmt.Sprintf("%d-%d", msg.Offset, msg.Partition)
 			select {
-			case forClient <- &Message{Data: msg.Value, Id: confirmID}:
+			case toConfirmID <- confirmID:
 			case <-ctx.Done():
 				grpclog.Println("context is done")
 				return c.Close()
 			}
 			select {
-			case toConfirmID <- confirmID:
+			case forClient <- &Message{Data: msg.Value, Id: confirmID}:
 			case <-ctx.Done():
 				grpclog.Println("context is done")
 				return c.Close()
@@ -93,24 +103,17 @@ func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClie
 	}
 }
 
-func (h *kafkaHandler) confirm(ctx context.Context, c *cluster.Consumer, id string, toConfirmID chan string, topic string) error {
-	select {
-	case cid := <-toConfirmID:
-		if cid != id {
-			return errInvalidConfirm
-		}
-		spl := strings.Split(cid, "-")
-		o, err := strconv.ParseInt(spl[0], 10, 64)
-		if err != nil {
-			return fmt.Errorf("error parsing message id '%s' : %s", id, err.Error())
-		}
-		p, err := strconv.ParseInt(spl[1], 10, 32)
-		if err != nil {
-			return fmt.Errorf("error parsing message id '%s' : %s", id, err.Error())
-		}
-		c.MarkPartitionOffset(topic, int32(p), o, "")
-	case <-ctx.Done():
+func (h *kafkaHandler) confirm(ctx context.Context, c *cluster.Consumer, id string, topic string) error {
+	spl := strings.Split(id, "-")
+	o, err := strconv.ParseInt(spl[0], 10, 64)
+	if err != nil {
+		return fmt.Errorf("error parsing message id '%s' : %s", id, err.Error())
 	}
+	p, err := strconv.ParseInt(spl[1], 10, 32)
+	if err != nil {
+		return fmt.Errorf("error parsing message id '%s' : %s", id, err.Error())
+	}
+	c.MarkPartitionOffset(topic, int32(p), o, "")
 	return nil
 }
 
