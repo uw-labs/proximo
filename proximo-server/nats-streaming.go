@@ -7,22 +7,35 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nats-io/go-nats"
 	"github.com/nats-io/go-nats-streaming"
 	"github.com/nats-io/go-nats-streaming/pb"
 )
 
 type natsStreamingHandler struct {
-	url       string
 	clusterID string
+	nc        *nats.Conn
+}
+
+func newNatsStreamingHandler(url, clusterID string) (*natsStreamingHandler, error) {
+	nc, err := nats.Connect(url, nats.Name("proximo-nats-streaming-"+generateID()))
+	if err != nil {
+		return nil, err
+	}
+	return &natsStreamingHandler{nc: nc, clusterID: clusterID}, nil
+}
+
+func (h *natsStreamingHandler) Close() error {
+	h.nc.Close()
+	return nil
 }
 
 func (h *natsStreamingHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
 
-	conn, err := stan.Connect(h.clusterID, conf.consumer+generateID(), stan.NatsURL(h.url))
+	conn, err := stan.Connect(h.clusterID, conf.consumer+generateID(), stan.NatsConn(h.nc))
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
 
 	ackQueue := make(chan *stan.Msg, 32) // TODO: configurable buffer
 
@@ -96,7 +109,7 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, conf consumerC
 
 func (h *natsStreamingHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
 
-	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsURL(h.url))
+	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsConn(h.nc))
 	if err != nil {
 		return err
 	}
