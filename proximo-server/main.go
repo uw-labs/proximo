@@ -8,7 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jawher/mow.cli"
+	"github.com/Shopify/sarama"
+	cli "github.com/jawher/mow.cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 )
@@ -37,8 +38,23 @@ func main() {
 			Desc:   "Broker addresses e.g., \"server1:9092,server2:9092\"",
 			EnvVar: "PROXIMO_KAFKA_BROKERS",
 		})
+		kafkaVersion := cmd.String(cli.StringOpt{
+			Name:   "version",
+			Desc:   "Kafka Version e.g. 1.1.1, 0.10.2.0",
+			EnvVar: "PROXIMO_KAFKA_VERSION",
+		})
+
 		cmd.Action = func() {
 			brokers := strings.Split(*brokerString, ",")
+
+			var version *sarama.KafkaVersion
+			if kafkaVersion != nil && *kafkaVersion != "" {
+				kv, err := sarama.ParseKafkaVersion(*kafkaVersion)
+				if err != nil {
+					log.Fatalf("failed to parse kafka version: %v ", err)
+				}
+				version = &kv
+			}
 
 			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 			if err != nil {
@@ -48,6 +64,7 @@ func main() {
 			grpcServer := grpc.NewServer(opts...)
 			kh := &kafkaHandler{
 				brokers: brokers,
+				version: version,
 			}
 			log.Printf("Using kafka at %s\n", brokers)
 			registerGRPCServers(grpcServer, &server{kh}, *endpoints)
