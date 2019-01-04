@@ -117,10 +117,11 @@ func main() {
 			}
 			var opts []grpc.ServerOption
 			grpcServer := grpc.NewServer(opts...)
-			kh := &natsStreamingHandler{
-				url:       *url,
-				clusterID: *cid,
+			kh, err := newNatsStreamingHandler(*url, *cid)
+			if err != nil {
+				log.Fatalf("failed to connect to nats streaming: %v", err)
 			}
+			defer kh.Close()
 			log.Printf("Using NATS streaming server at %s with cluster id %s\n", *url, *cid)
 			registerGRPCServers(grpcServer, &server{kh}, *endpoints)
 			log.Fatal(grpcServer.Serve(lis))
