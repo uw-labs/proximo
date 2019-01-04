@@ -10,6 +10,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	cli "github.com/jawher/mow.cli"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 )
@@ -56,19 +57,13 @@ func main() {
 				version = &kv
 			}
 
-			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-			if err != nil {
-				log.Fatalf("failed to listen: %v", err)
-			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
 			kh := &kafkaHandler{
 				brokers: brokers,
 				version: version,
 			}
+
 			log.Printf("Using kafka at %s\n", brokers)
-			registerGRPCServers(grpcServer, &server{kh}, *endpoints)
-			log.Fatal(grpcServer.Serve(lis))
+			log.Fatal(listenAndServe(kh, *port, *endpoints))
 		}
 	})
 
@@ -80,19 +75,11 @@ func main() {
 			EnvVar: "PROXIMO_AMQP_ADDRESS",
 		})
 		cmd.Action = func() {
-
-			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-			if err != nil {
-				log.Fatalf("failed to listen: %v", err)
-			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
 			kh := &amqpHandler{
 				address: *address,
 			}
 			log.Printf("Using AMQP at %s\n", *address)
-			registerGRPCServers(grpcServer, &server{kh}, *endpoints)
-			log.Fatal(grpcServer.Serve(lis))
+			log.Fatal(listenAndServe(kh, *port, *endpoints))
 		}
 	})
 
@@ -110,41 +97,22 @@ func main() {
 			EnvVar: "PROXIMO_NATS_CLUSTER_ID",
 		})
 		cmd.Action = func() {
-
-			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-			if err != nil {
-				log.Fatalf("failed to listen: %v", err)
-			}
-			var opts []grpc.ServerOption
-			grpcServer := grpc.NewServer(opts...)
 			kh, err := newNatsStreamingHandler(*url, *cid)
 			if err != nil {
 				log.Fatalf("failed to connect to nats streaming: %v", err)
 			}
-			defer kh.Close()
 			log.Printf("Using NATS streaming server at %s with cluster id %s\n", *url, *cid)
-			registerGRPCServers(grpcServer, &server{kh}, *endpoints)
-			log.Fatal(grpcServer.Serve(lis))
+
+			log.Fatal(listenAndServe(kh, *port, *endpoints))
 		}
 	})
 
 	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
 		cmd.Action = func() {
-
-			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-			if err != nil {
-				log.Fatalf("failed to listen: %v", err)
-			}
-			opts := []grpc.ServerOption{
-				grpc.KeepaliveParams(keepalive.ServerParameters{
-					Time: 5 * time.Minute,
-				}),
-			}
-			grpcServer := grpc.NewServer(opts...)
 			kh := newMemHandler()
+
 			log.Printf("Using in memory testing backend")
-			registerGRPCServers(grpcServer, &server{kh}, *endpoints)
-			log.Fatal(grpcServer.Serve(lis))
+			log.Fatal(listenAndServe(kh, *port, *endpoints))
 		}
 	})
 
@@ -162,4 +130,22 @@ func registerGRPCServers(grpcServer *grpc.Server, proximoServer *server, endpoin
 			log.Fatalf("invalid expose-endpoint flag: %s", endpoint)
 		}
 	}
+}
+
+func listenAndServe(handler handler, port int, endpoints string) error {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return errors.Wrap(err, "failed to listen")
+	}
+	opts := []grpc.ServerOption{
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			Time: 5 * time.Minute,
+		}),
+	}
+	grpcServer := grpc.NewServer(opts...)
+	registerGRPCServers(grpcServer, &server{handler}, endpoints)
+	if err := grpcServer.Serve(lis); err != nil {
+		return errors.Wrap(err, "failed to serve grpc")
+	}
+	return nil
 }
