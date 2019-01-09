@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/nats-io/go-nats"
 	"github.com/nats-io/go-nats-streaming"
 	"github.com/nats-io/go-nats-streaming/pb"
@@ -82,7 +84,7 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, conf consumerC
 		}
 	}
 
-	_, err = conn.QueueSubscribe(
+	subscription, err := conn.QueueSubscribe(
 		conf.topic,
 		conf.consumer,
 		f,
@@ -94,14 +96,23 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, conf consumerC
 	if err != nil {
 		return err
 	}
+	closeAll := func() error {
+		var closeErr error
+		for _, c := range []io.Closer{subscription, conn} {
+			if err := c.Close(); err != nil {
+				closeErr = multierror.Append(closeErr, err)
+			}
+		}
+		return closeErr
+	}
 
 	select {
 	case <-ctx.Done():
 		wg.Wait()
-		return conn.Close()
+		return closeAll()
 	case err := <-ackErrors:
 		wg.Wait()
-		conn.Close()
+		closeAll()
 		return err
 	}
 
@@ -121,6 +132,7 @@ func (h *natsStreamingHandler) HandleProduce(ctx context.Context, conf producerC
 		case msg := <-messages:
 			err := conn.Publish(conf.topic, msg.GetData())
 			if err != nil {
+				conn.Close()
 				return err
 			}
 			select {
