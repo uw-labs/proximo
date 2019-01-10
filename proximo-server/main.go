@@ -10,6 +10,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	cli "github.com/jawher/mow.cli"
+	"github.com/nats-io/go-nats-streaming"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
@@ -96,12 +97,18 @@ func main() {
 			Desc:   "cluster id",
 			EnvVar: "PROXIMO_NATS_CLUSTER_ID",
 		})
+		maxInflight := cmd.Int(cli.IntOpt{
+			Name:   "max-inflight",
+			Value:  stan.DefaultMaxInflight,
+			Desc:   "maximum number of unacknowledged messages",
+			EnvVar: "PROXIMO_NATS_MAX_INFLIGHT",
+		})
 		cmd.Action = func() {
-			kh, err := newNatsStreamingHandler(*url, *cid)
+			kh, err := newNatsStreamingHandler(*url, *cid, *maxInflight)
 			if err != nil {
 				log.Fatalf("failed to connect to nats streaming: %v", err)
 			}
-			log.Printf("Using NATS streaming server at %s with cluster id %s\n", *url, *cid)
+			log.Printf("Using NATS streaming server at %s with cluster id %s and max inflight %v\n", *url, *cid, *maxInflight)
 
 			log.Fatal(listenAndServe(kh, *port, *endpoints))
 		}

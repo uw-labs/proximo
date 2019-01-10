@@ -13,16 +13,17 @@ import (
 )
 
 type natsStreamingHandler struct {
-	clusterID string
-	nc        *nats.Conn
+	clusterID   string
+	maxInflight int
+	nc          *nats.Conn
 }
 
-func newNatsStreamingHandler(url, clusterID string) (*natsStreamingHandler, error) {
+func newNatsStreamingHandler(url, clusterID string, maxInflight int) (*natsStreamingHandler, error) {
 	nc, err := nats.Connect(url, nats.Name("proximo-nats-streaming-"+generateID()))
 	if err != nil {
 		return nil, err
 	}
-	return &natsStreamingHandler{nc: nc, clusterID: clusterID}, nil
+	return &natsStreamingHandler{nc: nc, clusterID: clusterID, maxInflight: maxInflight}, nil
 }
 
 func (h *natsStreamingHandler) Close() error {
@@ -37,7 +38,8 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, conf consumerC
 		return err
 	}
 
-	ackQueue := make(chan *stan.Msg, 32) // TODO: configurable buffer
+	// there can be at most `h.maxInflight` unacknowledged messages at any time
+	ackQueue := make(chan *stan.Msg, h.maxInflight)
 
 	ackErrors := make(chan error)
 
@@ -90,6 +92,7 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, conf consumerC
 		stan.DurableName(conf.consumer),
 		stan.SetManualAckMode(),
 		stan.AckWait(60*time.Second),
+		stan.MaxInflight(h.maxInflight),
 	)
 	if err != nil {
 		return err
