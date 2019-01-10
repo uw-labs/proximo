@@ -5,7 +5,9 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -144,6 +146,8 @@ func listenAndServe(handler handler, port int, endpoints string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to listen")
 	}
+	defer lis.Close()
+
 	opts := []grpc.ServerOption{
 		grpc.KeepaliveParams(keepalive.ServerParameters{
 			Time: 5 * time.Minute,
@@ -151,8 +155,17 @@ func listenAndServe(handler handler, port int, endpoints string) error {
 	}
 	grpcServer := grpc.NewServer(opts...)
 	registerGRPCServers(grpcServer, &server{handler}, endpoints)
-	if err := grpcServer.Serve(lis); err != nil {
+	defer grpcServer.Stop()
+
+	errCh := make(chan error, 1)
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	go func() { errCh <- grpcServer.Serve(lis) }()
+	select {
+	case err := <-errCh:
 		return errors.Wrap(err, "failed to serve grpc")
+	case <-sigCh:
+		return nil
 	}
-	return nil
 }
