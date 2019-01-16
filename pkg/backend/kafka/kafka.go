@@ -1,4 +1,4 @@
-package main
+package kafka
 
 import (
 	"context"
@@ -7,6 +7,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/uw-labs/proximo/pkg/backend"
+	"github.com/uw-labs/proximo/pkg/proto"
 
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
@@ -18,7 +21,15 @@ type kafkaHandler struct {
 	version *sarama.KafkaVersion
 }
 
-func (h *kafkaHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+// NewHandler returns an instance of `backend.Handler` that uses Kafka
+func NewHandler(version *sarama.KafkaVersion, brokers []string) (backend.Handler, error) {
+	return &kafkaHandler{
+		brokers: brokers,
+		version: version,
+	}, nil
+}
+
+func (h *kafkaHandler) HandleConsume(ctx context.Context, conf backend.ConsumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
 	toConfirmIds := make(chan string)
 
 	errors := make(chan error)
@@ -32,7 +43,7 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, conf consumerConfig, f
 		config.Version = *h.version
 	}
 
-	c, err := cluster.NewConsumer(h.brokers, conf.consumer, []string{conf.topic}, config)
+	c, err := cluster.NewConsumer(h.brokers, conf.Consumer, []string{conf.Topic}, config)
 	if err != nil {
 		return err
 	}
@@ -42,7 +53,7 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, conf consumerConfig, f
 	}()
 
 	go func() {
-		err := h.consume(ctx, c, forClient, toConfirmIds, conf.topic, conf.consumer)
+		err := h.consume(ctx, c, forClient, toConfirmIds, conf.Topic, conf.Consumer)
 		if err != nil {
 			errors <- err
 		}
@@ -55,12 +66,12 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, conf consumerConfig, f
 			toConfirm = append(toConfirm, tc)
 		case cr := <-confirmRequest:
 			if len(toConfirm) < 1 {
-				return errInvalidConfirm
+				return backend.ErrInvalidConfirm
 			}
 			if toConfirm[0] != cr.GetMsgID() {
-				return errInvalidConfirm
+				return backend.ErrInvalidConfirm
 			}
-			err := h.confirm(ctx, c, cr.GetMsgID(), conf.topic)
+			err := h.confirm(ctx, c, cr.GetMsgID(), conf.Topic)
 			if err != nil {
 				return err
 			}
@@ -73,7 +84,7 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, conf consumerConfig, f
 	}
 }
 
-func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClient chan<- *Message, toConfirmID chan string, topic, consumer string) error {
+func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClient chan<- *proto.Message, toConfirmID chan string, topic, consumer string) error {
 
 	grpclog.Println("started consume loop")
 	defer grpclog.Println("exited consume loop")
@@ -92,7 +103,7 @@ func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClie
 				return c.Close()
 			}
 			select {
-			case forClient <- &Message{Data: msg.Value, Id: confirmID}:
+			case forClient <- &proto.Message{Data: msg.Value, Id: confirmID}:
 			case <-ctx.Done():
 				grpclog.Println("context is done")
 				return c.Close()
@@ -121,7 +132,7 @@ func (h *kafkaHandler) confirm(ctx context.Context, c *cluster.Consumer, id stri
 	return nil
 }
 
-func (h *kafkaHandler) HandleProduce(ctx context.Context, cfg producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (h *kafkaHandler) HandleProduce(ctx context.Context, cfg backend.ProducerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
 	conf := sarama.NewConfig()
 	conf.Producer.Return.Successes = true
 	conf.Producer.RequiredAcks = sarama.WaitForAll
@@ -139,7 +150,7 @@ func (h *kafkaHandler) HandleProduce(ctx context.Context, cfg producerConfig, fo
 		select {
 		case m := <-messages:
 			pm := &sarama.ProducerMessage{
-				Topic: cfg.topic,
+				Topic: cfg.Topic,
 				Value: sarama.ByteEncoder(m.GetData()),
 				// Key = TODO:
 			}
@@ -148,7 +159,7 @@ func (h *kafkaHandler) HandleProduce(ctx context.Context, cfg producerConfig, fo
 			if err != nil {
 				return err
 			}
-			forClient <- &Confirmation{MsgID: m.GetId()}
+			forClient <- &proto.Confirmation{MsgID: m.GetId()}
 		case <-ctx.Done():
 			return nil
 		}

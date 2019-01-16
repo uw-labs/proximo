@@ -1,4 +1,4 @@
-package main
+package natsstreaming
 
 import (
 	"context"
@@ -10,6 +10,10 @@ import (
 	"github.com/nats-io/go-nats"
 	"github.com/nats-io/go-nats-streaming"
 	"github.com/nats-io/go-nats-streaming/pb"
+
+	"github.com/uw-labs/proximo/internal/id"
+	"github.com/uw-labs/proximo/pkg/backend"
+	"github.com/uw-labs/proximo/pkg/proto"
 )
 
 type natsStreamingHandler struct {
@@ -18,8 +22,9 @@ type natsStreamingHandler struct {
 	nc          *nats.Conn
 }
 
-func newNatsStreamingHandler(url, clusterID string, maxInflight int) (*natsStreamingHandler, error) {
-	nc, err := nats.Connect(url, nats.Name("proximo-nats-streaming-"+generateID()))
+// NewHandler returns an instance of `backend.Handler` that uses NATS Streaming
+func NewHandler(url, clusterID string, maxInflight int) (backend.Handler, error) {
+	nc, err := nats.Connect(url, nats.Name("proximo-nats-streaming-"+id.Generate()))
 	if err != nil {
 		return nil, err
 	}
@@ -31,9 +36,9 @@ func (h *natsStreamingHandler) Close() error {
 	return nil
 }
 
-func (h *natsStreamingHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (h *natsStreamingHandler) HandleConsume(ctx context.Context, conf backend.ConsumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
 
-	conn, err := stan.Connect(h.clusterID, conf.consumer+generateID(), stan.NatsConn(h.nc))
+	conn, err := stan.Connect(h.clusterID, conf.Consumer+id.Generate(), stan.NatsConn(h.nc))
 	if err != nil {
 		return err
 	}
@@ -79,17 +84,17 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, conf consumerC
 		select {
 		case <-ctx.Done():
 			return
-		case forClient <- &Message{Data: msg.Data, Id: strconv.FormatUint(msg.Sequence, 10)}:
+		case forClient <- &proto.Message{Data: msg.Data, Id: strconv.FormatUint(msg.Sequence, 10)}:
 			ackQueue <- msg
 		}
 	}
 
 	_, err = conn.QueueSubscribe(
-		conf.topic,
-		conf.consumer,
+		conf.Topic,
+		conf.Consumer,
 		f,
 		stan.StartAt(pb.StartPosition_First),
-		stan.DurableName(conf.consumer),
+		stan.DurableName(conf.Consumer),
 		stan.SetManualAckMode(),
 		stan.AckWait(60*time.Second),
 		stan.MaxInflight(h.maxInflight),
@@ -110,9 +115,9 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, conf consumerC
 
 }
 
-func (h *natsStreamingHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (h *natsStreamingHandler) HandleProduce(ctx context.Context, conf backend.ProducerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
 
-	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsConn(h.nc))
+	conn, err := stan.Connect(h.clusterID, id.Generate(), stan.NatsConn(h.nc))
 	if err != nil {
 		return err
 	}
@@ -122,12 +127,12 @@ func (h *natsStreamingHandler) HandleProduce(ctx context.Context, conf producerC
 		case <-ctx.Done():
 			return conn.Close()
 		case msg := <-messages:
-			err := conn.Publish(conf.topic, msg.GetData())
+			err := conn.Publish(conf.Topic, msg.GetData())
 			if err != nil {
 				return err
 			}
 			select {
-			case forClient <- &Confirmation{MsgID: msg.GetId()}:
+			case forClient <- &proto.Confirmation{MsgID: msg.GetId()}:
 			case <-ctx.Done():
 				return conn.Close()
 			}

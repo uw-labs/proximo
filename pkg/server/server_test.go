@@ -1,9 +1,12 @@
-package main
+package server
 
 import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/uw-labs/proximo/pkg/backend"
+	"github.com/uw-labs/proximo/pkg/proto"
 )
 
 // TestProduceCloseWithAckPending tried to recreate a scenario where a backend
@@ -24,8 +27,8 @@ func TestProduceCloseWithAckPending(t *testing.T) {
 	}()
 
 	// start request, then send message.
-	tscs.toSend <- &PublisherRequest{StartRequest: &StartPublishRequest{Topic: "topic"}}
-	tscs.toSend <- &PublisherRequest{Msg: &Message{Id: "message1", Data: []byte("message payload")}}
+	tscs.toSend <- &proto.PublisherRequest{StartRequest: &proto.StartPublishRequest{Topic: "topic"}}
+	tscs.toSend <- &proto.PublisherRequest{Msg: &proto.Message{Id: "message1", Data: []byte("message payload")}}
 
 	// without acking message, exit
 	tscs.cancel()
@@ -47,7 +50,7 @@ func newTestMessageSourceProduceServer() *testMessageSourceProduceServer {
 	return &testMessageSourceProduceServer{
 		ctx:       ctx,
 		cancel:    cancel,
-		toSend:    make(chan *PublisherRequest),
+		toSend:    make(chan *proto.PublisherRequest),
 		toSendErr: make(chan error, 1),
 	}
 }
@@ -55,15 +58,15 @@ func newTestMessageSourceProduceServer() *testMessageSourceProduceServer {
 type testMessageSourceProduceServer struct {
 	ctx       context.Context
 	cancel    func()
-	toSend    chan *PublisherRequest
+	toSend    chan *proto.PublisherRequest
 	toSendErr chan error
 }
 
-func (ms *testMessageSourceProduceServer) Send(*Confirmation) error {
+func (ms *testMessageSourceProduceServer) Send(*proto.Confirmation) error {
 	return nil
 }
 
-func (ms *testMessageSourceProduceServer) Recv() (*PublisherRequest, error) {
+func (ms *testMessageSourceProduceServer) Recv() (*proto.PublisherRequest, error) {
 	select {
 	case tr := <-ms.toSend:
 		return tr, nil
@@ -87,11 +90,11 @@ type mockProduceHandler struct {
 	releaseOne chan struct{}
 }
 
-func (mh *mockProduceHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (mh *mockProduceHandler) HandleConsume(ctx context.Context, conf backend.ConsumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
 	panic("this mock does not handle consume")
 }
 
-func (mh *mockProduceHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (mh *mockProduceHandler) HandleProduce(ctx context.Context, conf backend.ProducerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
 
 	go mh.loop(forClient, messages)
 
@@ -99,8 +102,8 @@ func (mh *mockProduceHandler) HandleProduce(ctx context.Context, conf producerCo
 	return nil
 }
 
-func (mh *mockProduceHandler) loop(forClient chan<- *Confirmation, messages <-chan *Message) {
-	var toConfirm []*Message
+func (mh *mockProduceHandler) loop(forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) {
+	var toConfirm []*proto.Message
 	for {
 		var rel chan struct{}
 		if len(toConfirm) > 0 {
@@ -110,7 +113,7 @@ func (mh *mockProduceHandler) loop(forClient chan<- *Confirmation, messages <-ch
 		case m := <-messages:
 			toConfirm = append(toConfirm, m)
 		case <-rel:
-			forClient <- &Confirmation{toConfirm[0].Id}
+			forClient <- &proto.Confirmation{MsgID: toConfirm[0].Id}
 			toConfirm = toConfirm[1:]
 		}
 	}

@@ -10,6 +10,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/uw-labs/proximo/pkg/backend"
+	"github.com/uw-labs/proximo/pkg/proto"
+	"github.com/uw-labs/proximo/pkg/server"
+
+	"github.com/uw-labs/proximo/pkg/backend/mem"
+	"github.com/uw-labs/proximo/pkg/backend/natsstreaming"
+
+	"github.com/uw-labs/proximo/pkg/backend/amqp"
+
+	"github.com/uw-labs/proximo/pkg/backend/kafka"
+
 	"github.com/Shopify/sarama"
 	cli "github.com/jawher/mow.cli"
 	"github.com/nats-io/go-nats-streaming"
@@ -55,14 +66,14 @@ func main() {
 			if kafkaVersion != nil && *kafkaVersion != "" {
 				kv, err := sarama.ParseKafkaVersion(*kafkaVersion)
 				if err != nil {
-					log.Fatalf("failed to parse kafka version: %v ", err)
+					log.Fatalf("failed to parse kafka version: %v", err)
 				}
 				version = &kv
 			}
 
-			kh := &kafkaHandler{
-				brokers: brokers,
-				version: version,
+			kh, err := kafka.NewHandler(version, brokers)
+			if err != nil {
+				log.Fatalf("failed to initialise kafka backend: %v", err)
 			}
 
 			log.Printf("Using kafka at %s\n", brokers)
@@ -78,11 +89,13 @@ func main() {
 			EnvVar: "PROXIMO_AMQP_ADDRESS",
 		})
 		cmd.Action = func() {
-			kh := &amqpHandler{
-				address: *address,
+			h, err := amqp.NewHandler(*address)
+			if err != nil {
+				log.Fatalf("failed to initialise amqp backend: %v", err)
 			}
+
 			log.Printf("Using AMQP at %s\n", *address)
-			log.Fatal(listenAndServe(kh, *port, *endpoints))
+			log.Fatal(listenAndServe(h, *port, *endpoints))
 		}
 	})
 
@@ -106,9 +119,9 @@ func main() {
 			EnvVar: "PROXIMO_NATS_MAX_INFLIGHT",
 		})
 		cmd.Action = func() {
-			kh, err := newNatsStreamingHandler(*url, *cid, *maxInflight)
+			kh, err := natsstreaming.NewHandler(*url, *cid, *maxInflight)
 			if err != nil {
-				log.Fatalf("failed to connect to nats streaming: %v", err)
+				log.Fatalf("failed to initialise nats streaming backend: %v ", err)
 			}
 			log.Printf("Using NATS streaming server at %s with cluster id %s and max inflight %v\n", *url, *cid, *maxInflight)
 
@@ -118,7 +131,10 @@ func main() {
 
 	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
 		cmd.Action = func() {
-			kh := newMemHandler()
+			kh, err := mem.NewHandler()
+			if err != nil {
+				log.Fatalf("failed to initialise in memory backend: %v ", err)
+			}
 
 			log.Printf("Using in memory testing backend")
 			log.Fatal(listenAndServe(kh, *port, *endpoints))
@@ -128,20 +144,20 @@ func main() {
 	log.Fatal(app.Run(os.Args))
 }
 
-func registerGRPCServers(grpcServer *grpc.Server, proximoServer *server, endpoints string) {
+func registerGRPCServers(grpcServer *grpc.Server, proximoServer proto.MessageServer, endpoints string) {
 	for _, endpoint := range strings.Split(endpoints, ",") {
 		switch endpoint {
 		case "consume":
-			RegisterMessageSourceServer(grpcServer, proximoServer)
+			proto.RegisterMessageSourceServer(grpcServer, proximoServer)
 		case "publish":
-			RegisterMessageSinkServer(grpcServer, proximoServer)
+			proto.RegisterMessageSinkServer(grpcServer, proximoServer)
 		default:
 			log.Fatalf("invalid expose-endpoint flag: %s", endpoint)
 		}
 	}
 }
 
-func listenAndServe(handler handler, port int, endpoints string) error {
+func listenAndServe(handler backend.Handler, port int, endpoints string) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return errors.Wrap(err, "failed to listen")
@@ -154,7 +170,7 @@ func listenAndServe(handler handler, port int, endpoints string) error {
 		}),
 	}
 	grpcServer := grpc.NewServer(opts...)
-	registerGRPCServers(grpcServer, &server{handler}, endpoints)
+	registerGRPCServers(grpcServer, server.New(handler), endpoints)
 	defer grpcServer.Stop()
 
 	errCh := make(chan error, 1)

@@ -1,8 +1,11 @@
-package main
+package amqp
 
 import (
 	"context"
 	"strconv"
+
+	"github.com/uw-labs/proximo/pkg/backend"
+	"github.com/uw-labs/proximo/pkg/proto"
 
 	"github.com/streadway/amqp"
 )
@@ -11,7 +14,12 @@ type amqpHandler struct {
 	address string
 }
 
-func (h *amqpHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+// NewHandler returns an instance of `backend.Handler` that uses AMQP
+func NewHandler(address string) (backend.Handler, error) {
+	return &amqpHandler{address: address}, nil
+}
+
+func (h *amqpHandler) HandleConsume(ctx context.Context, conf backend.ConsumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
 	conn, err := amqp.Dial(h.address)
 	if err != nil {
 		return err
@@ -26,7 +34,7 @@ func (h *amqpHandler) HandleConsume(ctx context.Context, conf consumerConfig, fo
 
 	// ensure exchange exists (but don't create it)
 	err = ch.ExchangeDeclarePassive(
-		conf.topic, // name
+		conf.Topic, // name
 		"topic",    // kind of exchange
 		true,       // durable
 		false,      // autodelete
@@ -40,7 +48,7 @@ func (h *amqpHandler) HandleConsume(ctx context.Context, conf consumerConfig, fo
 
 	// ensure queue exists and create if needed
 	q, err := ch.QueueDeclare(
-		conf.topic+":"+conf.consumer, // name
+		conf.Topic+":"+conf.Consumer, // name
 		true,                         // durable
 		false,                        // delete when usused
 		false,                        // exclusive
@@ -52,14 +60,14 @@ func (h *amqpHandler) HandleConsume(ctx context.Context, conf consumerConfig, fo
 	}
 
 	// bind queue to exchange if not already done.
-	err = ch.QueueBind(q.Name, "", conf.topic, false, nil)
+	err = ch.QueueBind(q.Name, "", conf.Topic, false, nil)
 	if err != nil {
 		return err
 	}
 
 	msgs, err := ch.Consume(
 		q.Name,        // queue
-		conf.consumer, // consumer
+		conf.Consumer, // consumer
 		false,         // auto-ack
 		false,         // exclusive
 		false,         // no-local
@@ -89,7 +97,7 @@ func (h *amqpHandler) HandleConsume(ctx context.Context, conf consumerConfig, fo
 	for {
 		select {
 		case msg := <-msgs:
-			message := &Message{Id: strconv.FormatUint(msg.DeliveryTag, 10), Data: msg.Body}
+			message := &proto.Message{Id: strconv.FormatUint(msg.DeliveryTag, 10), Data: msg.Body}
 			forClient <- message //TODO: can block. fix.
 		case <-ctx.Done():
 			return ch.Close()
@@ -99,6 +107,6 @@ func (h *amqpHandler) HandleConsume(ctx context.Context, conf consumerConfig, fo
 	}
 }
 
-func (h *amqpHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (h *amqpHandler) HandleProduce(ctx context.Context, conf backend.ProducerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
 	panic("not implemented")
 }

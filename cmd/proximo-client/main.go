@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/urfave/cli"
-	proximoc "github.com/uw-labs/proximo/proximoc-go"
+	"github.com/uw-labs/proximo/proximoc-go"
 )
 
 func main() {

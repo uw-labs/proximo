@@ -12,7 +12,13 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+
+	"github.com/uw-labs/proximo/pkg/proto"
 )
+
+type Message struct {
+	*proto.Message
+}
 
 func ConsumeContext(ctx context.Context, proximoAddress string, consumer string, topic string, f func(*Message) error) error {
 	return consumeContext(ctx, proximoAddress, consumer, topic, f, grpc.WithInsecure())
@@ -32,7 +38,7 @@ func consumeContext(ctx context.Context, proximoAddress string, consumer string,
 		return errors.Wrapf(err, "fail to dial %s", proximoAddress)
 	}
 	defer conn.Close()
-	client := NewMessageSourceClient(conn)
+	client := proto.NewMessageSourceClient(conn)
 
 	stream, err := client.Consume(ctx)
 	if err != nil {
@@ -44,7 +50,7 @@ func consumeContext(ctx context.Context, proximoAddress string, consumer string,
 	handled := make(chan string)
 	errs := make(chan error, 2)
 
-	ins := make(chan *Message, 16) // TODO: make buffer size configurable?
+	ins := make(chan *proto.Message, 16) // TODO: make buffer size configurable?
 
 	wg.Add(1)
 	go func() {
@@ -71,7 +77,7 @@ func consumeContext(ctx context.Context, proximoAddress string, consumer string,
 				if !ok {
 					return
 				}
-				if err := f(in); err != nil {
+				if err := f(&Message{in}); err != nil {
 					errs <- err
 					return
 				}
@@ -86,8 +92,8 @@ func consumeContext(ctx context.Context, proximoAddress string, consumer string,
 		}
 	}()
 
-	if err := stream.Send(&ConsumerRequest{
-		StartRequest: &StartConsumeRequest{
+	if err := stream.Send(&proto.ConsumerRequest{
+		StartRequest: &proto.StartConsumeRequest{
 			Topic:    topic,
 			Consumer: consumer,
 		},
@@ -98,7 +104,7 @@ func consumeContext(ctx context.Context, proximoAddress string, consumer string,
 	for {
 		select {
 		case id := <-handled:
-			if err := stream.Send(&ConsumerRequest{Confirmation: &Confirmation{MsgID: id}}); err != nil {
+			if err := stream.Send(&proto.ConsumerRequest{Confirmation: &proto.Confirmation{MsgID: id}}); err != nil {
 				if grpc.Code(err) == 1 {
 					return nil
 				}
@@ -129,7 +135,7 @@ func dialProducer(ctx context.Context, proximoAddress string, topic string, opts
 		return nil, err
 	}
 
-	client := NewMessageSinkClient(conn)
+	client := proto.NewMessageSinkClient(conn)
 
 	stream, err := client.Publish(ctx)
 	if err != nil {
@@ -137,8 +143,8 @@ func dialProducer(ctx context.Context, proximoAddress string, topic string, opts
 		return nil, err
 	}
 
-	if err := stream.Send(&PublisherRequest{
-		StartRequest: &StartPublishRequest{
+	if err := stream.Send(&proto.PublisherRequest{
+		StartRequest: &proto.StartPublishRequest{
 			Topic: topic,
 		},
 	}); err != nil {
@@ -163,7 +169,7 @@ type ProducerConn struct {
 	ctx    context.Context
 	cancel func()
 
-	stream MessageSink_PublishClient
+	stream proto.MessageSink_PublishClient
 
 	reqs chan req
 
@@ -202,7 +208,7 @@ func (p *ProducerConn) start() error {
 
 	//	defer p.stream.CloseSend()
 
-	confirmations := make(chan *Confirmation, 16) // TODO: make buffer size configurable?
+	confirmations := make(chan *proto.Confirmation, 16) // TODO: make buffer size configurable?
 
 	recvErr := make(chan error, 1)
 
@@ -245,7 +251,7 @@ func (p *ProducerConn) start() error {
 			case req := <-p.reqs:
 				id := makeId()
 				idErr[id] = req.resp
-				if err := p.stream.Send(&PublisherRequest{Msg: &Message{Data: req.data, Id: id}}); err != nil {
+				if err := p.stream.Send(&proto.PublisherRequest{Msg: &proto.Message{Data: req.data, Id: id}}); err != nil {
 					if grpc.Code(err) != 1 {
 						lerr = err
 						log.Printf("err error %v\n", err)

@@ -1,11 +1,12 @@
-package main
+package id
 
 import (
 	"crypto/rand"
 	"encoding/hex"
 )
 
-func generateID() string {
+// Generate generates a random id
+func Generate() string {
 	random := []byte{0, 0, 0, 0, 0, 0, 0, 0}
 	_, err := rand.Read(random)
 	if err != nil {

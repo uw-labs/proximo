@@ -1,10 +1,13 @@
-package main
+package server
 
 import (
 	"context"
 	"errors"
 	"io"
 	"strings"
+
+	"github.com/uw-labs/proximo/pkg/backend"
+	"github.com/uw-labs/proximo/pkg/proto"
 )
 
 var (
@@ -14,31 +17,21 @@ var (
 	errInvalidRequest = errors.New("invalid consumer request - this is possibly a bug in your client library")
 )
 
-type consumerConfig struct {
-	consumer string
-	topic    string
-}
-
-type producerConfig struct {
-	topic string
-}
-
-type handler interface {
-	HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error
-	HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error
-}
-
 type server struct {
-	handler handler
+	handler backend.Handler
 }
 
-func (s *server) Consume(stream MessageSource_ConsumeServer) error {
+func New(handler backend.Handler) proto.MessageServer {
+	return &server{handler: handler}
+}
+
+func (s *server) Consume(stream proto.MessageSource_ConsumeServer) error {
 
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
-	startRequest := make(chan *StartConsumeRequest)
-	confirmRequest := make(chan *Confirmation)
+	startRequest := make(chan *proto.StartConsumeRequest)
+	confirmRequest := make(chan *proto.Confirmation)
 	errors := make(chan error, 3)
 
 	go func() {
@@ -87,7 +80,7 @@ func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 		return nil //ctx.Err()
 	}
 
-	forClient := make(chan *Message)
+	forClient := make(chan *proto.Message)
 
 	go func() {
 		for {
@@ -108,9 +101,9 @@ func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 	}()
 
 	go func() {
-		conf := consumerConfig{
-			consumer: consumer,
-			topic:    topic,
+		conf := backend.ConsumerConfig{
+			Consumer: consumer,
+			Topic:    topic,
 		}
 		err := s.handler.HandleConsume(ctx, conf, forClient, confirmRequest)
 		if err != nil {
@@ -130,12 +123,12 @@ func (s *server) Consume(stream MessageSource_ConsumeServer) error {
 // messageSink_PublishServer is a subset of the auto-generated
 // MessageSink_PublishServer interface and makes things easier in tests.
 type messageSink_PublishServer interface {
-	Send(*Confirmation) error
-	Recv() (*PublisherRequest, error)
+	Send(*proto.Confirmation) error
+	Recv() (*proto.PublisherRequest, error)
 	Context() context.Context
 }
 
-func (s *server) Publish(stream MessageSink_PublishServer) error {
+func (s *server) Publish(stream proto.MessageSink_PublishServer) error {
 	return s.publish(stream)
 }
 
@@ -144,8 +137,8 @@ func (s *server) publish(stream messageSink_PublishServer) error {
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
-	startRequest := make(chan *StartPublishRequest)
-	messages := make(chan *Message)
+	startRequest := make(chan *proto.StartPublishRequest)
+	messages := make(chan *proto.Message)
 	errors := make(chan error, 3)
 
 	go func() {
@@ -189,7 +182,7 @@ func (s *server) publish(stream messageSink_PublishServer) error {
 		return nil //ctx.Err()
 	}
 
-	forClient := make(chan *Confirmation)
+	forClient := make(chan *proto.Confirmation)
 
 	go func() {
 		for m := range forClient {
@@ -203,8 +196,8 @@ func (s *server) publish(stream messageSink_PublishServer) error {
 
 	go func() {
 		defer close(forClient)
-		conf := producerConfig{
-			topic: topic,
+		conf := backend.ProducerConfig{
+			Topic: topic,
 		}
 		err := s.handler.HandleProduce(ctx, conf, forClient, messages)
 		if err != nil {
