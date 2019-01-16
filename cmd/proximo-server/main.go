@@ -10,23 +10,20 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/uw-labs/proximo/pkg/backend"
-	"github.com/uw-labs/proximo/pkg/proto"
-	"github.com/uw-labs/proximo/pkg/server"
-
-	"github.com/uw-labs/proximo/pkg/backend/mem"
-	"github.com/uw-labs/proximo/pkg/backend/natsstreaming"
-
-	"github.com/uw-labs/proximo/pkg/backend/amqp"
-
-	"github.com/uw-labs/proximo/pkg/backend/kafka"
-
 	"github.com/Shopify/sarama"
 	cli "github.com/jawher/mow.cli"
 	"github.com/nats-io/go-nats-streaming"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+
+	"github.com/uw-labs/proximo/pkg/backend"
+	"github.com/uw-labs/proximo/pkg/backend/amqp"
+	"github.com/uw-labs/proximo/pkg/backend/kafka"
+	"github.com/uw-labs/proximo/pkg/backend/mem"
+	"github.com/uw-labs/proximo/pkg/backend/natsstreaming"
+	"github.com/uw-labs/proximo/pkg/proto"
+	"github.com/uw-labs/proximo/pkg/server"
 )
 
 func main() {
