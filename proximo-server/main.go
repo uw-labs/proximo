@@ -134,12 +134,13 @@ func main() {
 		})
 		cmd.Action = func() {
 			if enabled[consumeEndpoint] {
-				h, err := newNatsStreamingConsumeHandler(*url, *cid, *maxInflight)
-				if err != nil {
-					log.Fatalf("failed to connect to nats streaming for consumption: %v", err)
+				cHandler = substrateConsumeHandler{
+					Initialiser: natsStreamingSourceInitialiser{
+						url:         *url,
+						clusterID:   *cid,
+						maxInflight: *maxInflight,
+					},
 				}
-				cHandler = h
-				defer h.Close()
 			}
 			if enabled[publishEndpoint] {
 				h, err := newNatsStreamingProduceHandler(*url, *cid, *maxInflight)
