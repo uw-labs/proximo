@@ -114,7 +114,7 @@ func (h memBackend) loop() {
 						select {
 						case <-sub.ctx.Done():
 							// drop expired consumers
-						case sub.msgs <- &substrateMessage{inm.message.GetData()}:
+						case sub.msgs <- &substrateMessage{proximoMsg: inm.message}:
 							remaining = append(remaining, sub)
 							sentOne = true
 						}
@@ -124,7 +124,7 @@ func (h memBackend) loop() {
 				}
 			}
 
-			h.last100[inm.topic] = append(h.last100[inm.topic], &substrateMessage{inm.message.GetData()})
+			h.last100[inm.topic] = append(h.last100[inm.topic], &substrateMessage{proximoMsg: inm.message})
 			for len(h.last100[inm.topic]) > 100 {
 				h.last100[inm.topic] = h.last100[inm.topic][1:]
 			}
@@ -142,12 +142,4 @@ type sub struct {
 	consumer string
 	msgs     chan<- substrate.Message
 	ctx      context.Context
-}
-
-type substrateMessage struct {
-	data []byte
-}
-
-func (m *substrateMessage) Data() []byte {
-	return m.data
 }
