@@ -138,12 +138,12 @@ func main() {
 				}
 			}
 			if enabled[publishEndpoint] {
-				h, err := newNatsStreamingProduceHandler(*url, *cid, *maxInflight)
-				if err != nil {
-					log.Fatalf("failed to connect to nats streaming for production: %v", err)
+				pHandler = substrateProduceHandler{
+					Initialiser: natsStreamingSinkInitialiser{
+						url:       *url,
+						clusterID: *cid,
+					},
 				}
-				pHandler = h
-				defer h.Close()
 			}
 
 			log.Printf("Using NATS streaming server at %s with cluster id %s and max inflight %v\n", *url, *cid, *maxInflight)
