@@ -60,19 +60,19 @@ func (h substrateConsumeHandler) passMessagesToClient(ctx context.Context, messa
 		select {
 		case <-ctx.Done():
 			return nil
-		case msg := <-messages:
-			ackM := &ackMessage{
+		case sMsg := <-messages:
+			ackMsg := &ackMessage{
 				id:           uuid.Must(uuid.NewV4()).String(),
-				substrateMsg: msg,
+				substrateMsg: sMsg,
 			}
 			select {
 			case <-ctx.Done():
 				return nil
-			case toAck <- ackM:
+			case toAck <- ackMsg:
 			}
 			pMsg := &Message{
-				Id:   ackM.id,
-				Data: msg.Data(),
+				Id:   ackMsg.id,
+				Data: sMsg.Data(),
 			}
 			select {
 			case <-ctx.Done():
@@ -90,8 +90,12 @@ func (h substrateConsumeHandler) passAcksToSubstrate(ctx context.Context, confir
 		select {
 		case <-ctx.Done():
 			return nil
-		case aMsg := <-toAck:
-			ackMap[aMsg.id] = aMsg.substrateMsg
+		case ackMsg := <-toAck:
+			if dMsg, ok := ackMsg.substrateMsg.(substrate.DiscardableMessage); ok {
+				// Discard payload to save space
+				dMsg.DiscardPayload()
+			}
+			ackMap[ackMsg.id] = ackMsg.substrateMsg
 		case conf := <-confirmRequest:
 			sMsg, ok := ackMap[conf.MsgID]
 			if !ok {
