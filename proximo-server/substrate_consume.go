@@ -65,14 +65,16 @@ func (h substrateConsumeHandler) passMessagesToClient(ctx context.Context, messa
 				id:           uuid.Must(uuid.NewV4()).String(),
 				substrateMsg: sMsg,
 			}
+			pMsg := &Message{
+				Id: ackMsg.id,
+				// Read the data now so that we can safely discard the payload
+				// once the message is passed to the ack handler.
+				Data: sMsg.Data(),
+			}
 			select {
 			case <-ctx.Done():
 				return nil
 			case toAck <- ackMsg:
-			}
-			pMsg := &Message{
-				Id:   ackMsg.id,
-				Data: sMsg.Data(),
 			}
 			select {
 			case <-ctx.Done():
