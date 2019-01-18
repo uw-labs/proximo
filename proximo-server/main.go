@@ -18,7 +18,18 @@ import (
 	"google.golang.org/grpc/keepalive"
 )
 
+const (
+	consumeEndpoint = "consume"
+	publishEndpoint = "publish"
+)
+
 func main() {
+	var (
+		cHandler consumeHandler
+		pHandler produceHandler
+		enabled  map[string]bool
+	)
+
 	app := cli.App("proximo", "GRPC Proxy gateway for message queue systems")
 
 	port := app.Int(cli.IntOpt{
@@ -30,10 +41,14 @@ func main() {
 
 	endpoints := app.String(cli.StringOpt{
 		Name:   "endpoints",
-		Value:  "consume,publish",
+		Value:  fmt.Sprintf("%s,%s", consumeEndpoint, publishEndpoint),
 		Desc:   "The proximo endpoints to expose (consume, publish)",
 		EnvVar: "PROXIMO_ENDPOINTS",
 	})
+
+	app.Before = func() {
+		enabled = parseEndpoints(*endpoints)
+	}
 
 	app.Command("kafka", "Use kafka backend", func(cmd *cli.Cmd) {
 		brokerString := cmd.String(cli.StringOpt{
@@ -60,13 +75,20 @@ func main() {
 				version = &kv
 			}
 
-			kh := &kafkaHandler{
-				brokers: brokers,
-				version: version,
+			if enabled[consumeEndpoint] {
+				cHandler = &kafkaConsumeHandler{
+					brokers: brokers,
+					version: version,
+				}
+			}
+			if enabled[publishEndpoint] {
+				pHandler = &kafkaProduceHandler{
+					brokers: brokers,
+					version: version,
+				}
 			}
 
 			log.Printf("Using kafka at %s\n", brokers)
-			log.Fatal(listenAndServe(kh, *port, *endpoints))
 		}
 	})
 
@@ -81,8 +103,13 @@ func main() {
 			kh := &amqpHandler{
 				address: *address,
 			}
+			if enabled[consumeEndpoint] {
+				cHandler = kh
+			}
+			if enabled[publishEndpoint] {
+				log.Fatal("publish endpoint not impelented by amqp backend")
+			}
 			log.Printf("Using AMQP at %s\n", *address)
-			log.Fatal(listenAndServe(kh, *port, *endpoints))
 		}
 	})
 
@@ -106,42 +133,64 @@ func main() {
 			EnvVar: "PROXIMO_NATS_MAX_INFLIGHT",
 		})
 		cmd.Action = func() {
-			kh, err := newNatsStreamingHandler(*url, *cid, *maxInflight)
-			if err != nil {
-				log.Fatalf("failed to connect to nats streaming: %v", err)
+			if enabled[consumeEndpoint] {
+				h, err := newNatsStreamingConsumeHandler(*url, *cid, *maxInflight)
+				if err != nil {
+					log.Fatalf("failed to connect to nats streaming for consumption: %v", err)
+				}
+				cHandler = h
+				defer h.Close()
 			}
-			log.Printf("Using NATS streaming server at %s with cluster id %s and max inflight %v\n", *url, *cid, *maxInflight)
+			if enabled[publishEndpoint] {
+				h, err := newNatsStreamingProduceHandler(*url, *cid, *maxInflight)
+				if err != nil {
+					log.Fatalf("failed to connect to nats streaming for production: %v", err)
+				}
+				pHandler = h
+				defer h.Close()
+			}
 
-			log.Fatal(listenAndServe(kh, *port, *endpoints))
+			log.Printf("Using NATS streaming server at %s with cluster id %s and max inflight %v\n", *url, *cid, *maxInflight)
 		}
 	})
 
 	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
 		cmd.Action = func() {
-			kh := newMemHandler()
+			h := newMemHandler()
+
+			if enabled[consumeEndpoint] {
+				cHandler = h
+			}
+			if enabled[publishEndpoint] {
+				pHandler = h
+			}
 
 			log.Printf("Using in memory testing backend")
-			log.Fatal(listenAndServe(kh, *port, *endpoints))
 		}
 	})
 
-	log.Fatal(app.Run(os.Args))
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+	}
+	log.Fatal(listenAndServe(cHandler, pHandler, *port))
 }
 
-func registerGRPCServers(grpcServer *grpc.Server, proximoServer *server, endpoints string) {
+func parseEndpoints(endpoints string) map[string]bool {
+	enabled := make(map[string]bool, 2)
+
 	for _, endpoint := range strings.Split(endpoints, ",") {
 		switch endpoint {
-		case "consume":
-			RegisterMessageSourceServer(grpcServer, proximoServer)
-		case "publish":
-			RegisterMessageSinkServer(grpcServer, proximoServer)
+		case consumeEndpoint, publishEndpoint:
+			log.Printf("%s endpoint enabled\n", endpoint)
+			enabled[endpoint] = true
 		default:
 			log.Fatalf("invalid expose-endpoint flag: %s", endpoint)
 		}
 	}
-}
 
-func listenAndServe(handler handler, port int, endpoints string) error {
+	return enabled
+}
+func listenAndServe(cHandler consumeHandler, pHandler produceHandler, port int) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return errors.Wrap(err, "failed to listen")
@@ -154,8 +203,14 @@ func listenAndServe(handler handler, port int, endpoints string) error {
 		}),
 	}
 	grpcServer := grpc.NewServer(opts...)
-	registerGRPCServers(grpcServer, &server{handler}, endpoints)
 	defer grpcServer.Stop()
+
+	if cHandler != nil {
+		RegisterMessageSourceServer(grpcServer, &consumeServer{handler: cHandler})
+	}
+	if pHandler != nil {
+		RegisterMessageSinkServer(grpcServer, &produceServer{handler: pHandler})
+	}
 
 	errCh := make(chan error, 1)
 	sigCh := make(chan os.Signal, 1)

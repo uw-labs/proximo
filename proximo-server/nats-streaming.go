@@ -14,26 +14,26 @@ import (
 	"github.com/nats-io/go-nats-streaming/pb"
 )
 
-type natsStreamingHandler struct {
+type natsStreamingConsumeHandler struct {
 	clusterID   string
 	maxInflight int
 	nc          *nats.Conn
 }
 
-func newNatsStreamingHandler(url, clusterID string, maxInflight int) (*natsStreamingHandler, error) {
+func newNatsStreamingConsumeHandler(url, clusterID string, maxInflight int) (*natsStreamingConsumeHandler, error) {
 	nc, err := nats.Connect(url, nats.Name("proximo-nats-streaming-"+generateID()))
 	if err != nil {
 		return nil, err
 	}
-	return &natsStreamingHandler{nc: nc, clusterID: clusterID, maxInflight: maxInflight}, nil
+	return &natsStreamingConsumeHandler{nc: nc, clusterID: clusterID, maxInflight: maxInflight}, nil
 }
 
-func (h *natsStreamingHandler) Close() error {
+func (h *natsStreamingConsumeHandler) Close() error {
 	h.nc.Close()
 	return nil
 }
 
-func (h *natsStreamingHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
 
 	conn, err := stan.Connect(h.clusterID, conf.consumer+generateID(), stan.NatsConn(h.nc))
 	if err != nil {
@@ -121,7 +121,26 @@ func (h *natsStreamingHandler) HandleConsume(ctx context.Context, conf consumerC
 
 }
 
-func (h *natsStreamingHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
+type natsStreamingProduceHandler struct {
+	clusterID   string
+	maxInflight int
+	nc          *nats.Conn
+}
+
+func newNatsStreamingProduceHandler(url, clusterID string, maxInflight int) (*natsStreamingProduceHandler, error) {
+	nc, err := nats.Connect(url, nats.Name("proximo-nats-streaming-"+generateID()))
+	if err != nil {
+		return nil, err
+	}
+	return &natsStreamingProduceHandler{nc: nc, clusterID: clusterID, maxInflight: maxInflight}, nil
+}
+
+func (h *natsStreamingProduceHandler) Close() error {
+	h.nc.Close()
+	return nil
+}
+
+func (h *natsStreamingProduceHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
 
 	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsConn(h.nc))
 	if err != nil {

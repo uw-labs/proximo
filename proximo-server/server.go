@@ -23,16 +23,19 @@ type producerConfig struct {
 	topic string
 }
 
-type handler interface {
+type consumeHandler interface {
 	HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error
+}
+
+type produceHandler interface {
 	HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error
 }
 
-type server struct {
-	handler handler
+type consumeServer struct {
+	handler consumeHandler
 }
 
-func (s *server) Consume(stream MessageSource_ConsumeServer) error {
+func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
 
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
@@ -135,11 +138,15 @@ type messageSink_PublishServer interface {
 	Context() context.Context
 }
 
-func (s *server) Publish(stream MessageSink_PublishServer) error {
+type produceServer struct {
+	handler produceHandler
+}
+
+func (s *produceServer) Publish(stream MessageSink_PublishServer) error {
 	return s.publish(stream)
 }
 
-func (s *server) publish(stream messageSink_PublishServer) error {
+func (s *produceServer) publish(stream messageSink_PublishServer) error {
 
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()

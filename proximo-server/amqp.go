@@ -98,7 +98,3 @@ func (h *amqpHandler) HandleConsume(ctx context.Context, conf consumerConfig, fo
 		}
 	}
 }
-
-func (h *amqpHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
-	panic("not implemented")
-}

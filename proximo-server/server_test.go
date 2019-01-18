@@ -13,7 +13,7 @@ import (
 func TestProduceCloseWithAckPending(t *testing.T) {
 	handler := newMockProduceHandler()
 
-	svr := &server{handler}
+	svr := &produceServer{handler}
 
 	tscs := newTestMessageSourceProduceServer()
 
@@ -85,10 +85,6 @@ func newMockProduceHandler() *mockProduceHandler {
 type mockProduceHandler struct {
 	// write to this chan to release a confirmation for a message that's been sent.
 	releaseOne chan struct{}
-}
-
-func (mh *mockProduceHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
-	panic("this mock does not handle consume")
 }
 
 func (mh *mockProduceHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {

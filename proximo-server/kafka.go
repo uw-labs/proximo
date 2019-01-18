@@ -13,12 +13,12 @@ import (
 	"google.golang.org/grpc/grpclog"
 )
 
-type kafkaHandler struct {
+type kafkaConsumeHandler struct {
 	brokers []string
 	version *sarama.KafkaVersion
 }
 
-func (h *kafkaHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (h *kafkaConsumeHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
 	toConfirmIds := make(chan string)
 
 	errors := make(chan error)
@@ -73,7 +73,7 @@ func (h *kafkaHandler) HandleConsume(ctx context.Context, conf consumerConfig, f
 	}
 }
 
-func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClient chan<- *Message, toConfirmID chan string, topic, consumer string) error {
+func (h *kafkaConsumeHandler) consume(ctx context.Context, c *cluster.Consumer, forClient chan<- *Message, toConfirmID chan string, topic, consumer string) error {
 
 	grpclog.Println("started consume loop")
 	defer grpclog.Println("exited consume loop")
@@ -107,7 +107,7 @@ func (h *kafkaHandler) consume(ctx context.Context, c *cluster.Consumer, forClie
 	}
 }
 
-func (h *kafkaHandler) confirm(ctx context.Context, c *cluster.Consumer, id string, topic string) error {
+func (h *kafkaConsumeHandler) confirm(ctx context.Context, c *cluster.Consumer, id string, topic string) error {
 	spl := strings.Split(id, "-")
 	o, err := strconv.ParseInt(spl[0], 10, 64)
 	if err != nil {
@@ -121,7 +121,12 @@ func (h *kafkaHandler) confirm(ctx context.Context, c *cluster.Consumer, id stri
 	return nil
 }
 
-func (h *kafkaHandler) HandleProduce(ctx context.Context, cfg producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
+type kafkaProduceHandler struct {
+	brokers []string
+	version *sarama.KafkaVersion
+}
+
+func (h *kafkaProduceHandler) HandleProduce(ctx context.Context, cfg producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
 	conf := sarama.NewConfig()
 	conf.Producer.Return.Successes = true
 	conf.Producer.RequiredAcks = sarama.WaitForAll
