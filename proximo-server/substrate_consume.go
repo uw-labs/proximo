@@ -3,14 +3,13 @@ package main
 import (
 	"context"
 
-	"github.com/gofrs/uuid"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
+	"github.com/gofrs/uuid"
 	"github.com/uw-labs/substrate"
 )
-
-// TODO: wrap errors with appropriate gRPC error codes
 
 type SourceInitialiser interface {
 	New(conf consumerConfig) (substrate.AsyncMessageSource, error)
@@ -49,18 +48,24 @@ func (h substrateConsumeHandler) HandleConsume(ctx context.Context, conf consume
 	})
 
 	if err = eg.Wait(); err != nil {
-		return err
+		if ackErr, ok := err.(substrate.InvalidAckError); ok {
+			return status.Error(codes.InvalidArgument, ackErr.Error())
+		}
+		return status.Error(codes.Unavailable, err.Error())
 	}
 
+	if err = ctx.Err(); err == context.Canceled {
+		return status.Error(codes.Canceled, err.Error())
+	}
 	return ctx.Err()
 }
 
-func (h substrateConsumeHandler) passMessagesToClient(ctx context.Context, messages <-chan substrate.Message, forClient chan<- *Message, toAck chan<- *ackMessage) error {
+func (h substrateConsumeHandler) passMessagesToClient(ctx context.Context, fromSubstrate <-chan substrate.Message, toClient chan<- *Message, toAck chan<- *ackMessage) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case sMsg := <-messages:
+		case sMsg := <-fromSubstrate:
 			ackMsg := &ackMessage{
 				id:           uuid.Must(uuid.NewV4()).String(),
 				substrateMsg: sMsg,
@@ -79,13 +84,13 @@ func (h substrateConsumeHandler) passMessagesToClient(ctx context.Context, messa
 			select {
 			case <-ctx.Done():
 				return nil
-			case forClient <- pMsg:
+			case toClient <- pMsg:
 			}
 		}
 	}
 }
 
-func (h substrateConsumeHandler) passAcksToSubstrate(ctx context.Context, confirmRequest <-chan *Confirmation, acks chan<- substrate.Message, toAck <-chan *ackMessage) error {
+func (h substrateConsumeHandler) passAcksToSubstrate(ctx context.Context, fromClient <-chan *Confirmation, toSubstrate chan<- substrate.Message, toAck <-chan *ackMessage) error {
 	ackMap := make(map[string]substrate.Message)
 
 	for {
@@ -94,21 +99,20 @@ func (h substrateConsumeHandler) passAcksToSubstrate(ctx context.Context, confir
 			return nil
 		case ackMsg := <-toAck:
 			if dMsg, ok := ackMsg.substrateMsg.(substrate.DiscardableMessage); ok {
-				// Discard payload to save space
-				dMsg.DiscardPayload()
+				dMsg.DiscardPayload() // Discard payload to save space
 			}
 			ackMap[ackMsg.id] = ackMsg.substrateMsg
-		case conf := <-confirmRequest:
-			sMsg, ok := ackMap[conf.MsgID]
+		case ack := <-fromClient:
+			sMsg, ok := ackMap[ack.MsgID]
 			if !ok {
-				return errors.Errorf("invalid confirmation for message with id `%s`", conf.MsgID)
+				return status.Errorf(codes.InvalidArgument, "no message to confirm with id `%s`", ack.MsgID)
 			}
-			delete(ackMap, conf.MsgID)
+			delete(ackMap, ack.MsgID)
 
 			select {
 			case <-ctx.Done():
 				return nil
-			case acks <- sMsg:
+			case toSubstrate <- sMsg:
 			}
 		}
 	}
