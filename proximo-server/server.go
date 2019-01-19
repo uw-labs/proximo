@@ -48,59 +48,11 @@ func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
 	confirmRequest := make(chan *Confirmation)
 
 	eg.Go(func() error {
-		started := false
-		for {
-			msg, err := stream.Recv()
-			if err != nil {
-				if err == io.EOF {
-					return nil
-				}
-				if strings.HasSuffix(err.Error(), "context canceled") {
-					return nil
-				}
-				return err
-			}
-			switch {
-			case msg.GetStartRequest() != nil:
-				if started {
-					return errStartedTwice
-				}
-				started = true
-				select {
-				case startRequest <- msg.GetStartRequest():
-				case <-ctx.Done():
-					return nil
-				}
-			case msg.GetConfirmation() != nil:
-				if !started {
-					return errInvalidConfirm
-				}
-				select {
-				case confirmRequest <- msg.GetConfirmation():
-				case <-ctx.Done():
-					return nil
-				}
-			default:
-				return errInvalidRequest
-			}
-		}
+		return s.receiveFromClient(ctx, stream, startRequest, confirmRequest)
 	})
 
 	eg.Go(func() error {
-		for {
-			select {
-			case m := <-forClient:
-				err := stream.Send(m)
-				if err != nil {
-					if strings.HasSuffix(err.Error(), "context canceled") {
-						return nil
-					}
-					return err
-				}
-			case <-ctx.Done():
-				return nil
-			}
-		}
+		return s.sendMessagesToClient(ctx, stream, forClient)
 	})
 
 	eg.Go(func() error {
@@ -128,6 +80,70 @@ func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
 		return status.Error(codes.Canceled, err.Error())
 	}
 	return sCtx.Err()
+}
+
+type receiveConsumerStream interface {
+	Recv() (*ConsumerRequest, error)
+}
+
+func (s *consumeServer) receiveFromClient(ctx context.Context, stream receiveConsumerStream, startRequest chan<- *StartConsumeRequest, confirmRequest chan<- *Confirmation) error {
+	started := false
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			if strings.HasSuffix(err.Error(), "context canceled") {
+				return nil
+			}
+			return err
+		}
+		switch {
+		case msg.GetStartRequest() != nil:
+			if started {
+				return errStartedTwice
+			}
+			started = true
+			select {
+			case startRequest <- msg.GetStartRequest():
+			case <-ctx.Done():
+				return nil
+			}
+		case msg.GetConfirmation() != nil:
+			if !started {
+				return errInvalidConfirm
+			}
+			select {
+			case confirmRequest <- msg.GetConfirmation():
+			case <-ctx.Done():
+				return nil
+			}
+		default:
+			return errInvalidRequest
+		}
+	}
+}
+
+type sendConsumerStream interface {
+	Send(*Message) error
+}
+
+func (s *consumeServer) sendMessagesToClient(ctx context.Context, stream sendConsumerStream, forClient <-chan *Message) error {
+	for {
+		select {
+		case m := <-forClient:
+			err := stream.Send(m)
+			if err != nil {
+				if strings.HasSuffix(err.Error(), "context canceled") {
+					return nil
+				}
+				return err
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
 }
 
 // messageSink_PublishServer is a subset of the auto-generated
