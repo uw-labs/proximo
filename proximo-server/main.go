@@ -76,9 +76,11 @@ func main() {
 			}
 
 			if enabled[consumeEndpoint] {
-				cHandler = &kafkaConsumeHandler{
-					brokers: brokers,
-					version: version,
+				cHandler = &substrateConsumeHandler{
+					Initialiser: kafkaSourceInitialiser{
+						brokers: brokers,
+						version: version,
+					},
 				}
 			}
 			if enabled[publishEndpoint] {
