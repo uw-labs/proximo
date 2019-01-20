@@ -49,12 +49,12 @@ func (msg *amqpSubstrateMessage) DiscardPayload() {
 	msg.data = nil
 }
 
-func (h *amqpAsyncMessageSource) Close() error {
-	return h.conn.Close()
+func (s *amqpAsyncMessageSource) Close() error {
+	return s.conn.Close()
 }
 
-func (h *amqpAsyncMessageSource) ConsumeMessages(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
-	ch, err := h.conn.Channel()
+func (s *amqpAsyncMessageSource) ConsumeMessages(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
+	ch, err := s.conn.Channel()
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func (h *amqpAsyncMessageSource) ConsumeMessages(ctx context.Context, messages c
 
 	// ensure exchange exists (but don't create it)
 	err = ch.ExchangeDeclarePassive(
-		h.topic, // name
+		s.topic, // name
 		"topic", // kind of exchange
 		true,    // durable
 		false,   // autodelete
@@ -76,7 +76,7 @@ func (h *amqpAsyncMessageSource) ConsumeMessages(ctx context.Context, messages c
 
 	// ensure queue exists and create if needed
 	q, err := ch.QueueDeclare(
-		h.topic+":"+h.consumer, // name
+		s.topic+":"+s.consumer, // name
 		true,                   // durable
 		false,                  // delete when usused
 		false,                  // exclusive
@@ -88,14 +88,14 @@ func (h *amqpAsyncMessageSource) ConsumeMessages(ctx context.Context, messages c
 	}
 
 	// bind queue to exchange if not already done.
-	err = ch.QueueBind(q.Name, "", h.topic, false, nil)
+	err = ch.QueueBind(q.Name, "", s.topic, false, nil)
 	if err != nil {
 		return err
 	}
 
 	fromAMQP, err := ch.Consume(
 		q.Name,     // queue
-		h.consumer, // consumer
+		s.consumer, // consumer
 		false,      // auto-ack
 		false,      // exclusive
 		false,      // no-local
@@ -159,6 +159,6 @@ func (h *amqpAsyncMessageSource) ConsumeMessages(ctx context.Context, messages c
 	return eg.Wait()
 }
 
-func (h *amqpAsyncMessageSource) Status() (*substrate.Status, error) {
+func (s *amqpAsyncMessageSource) Status() (*substrate.Status, error) {
 	panic("not implemented")
 }
