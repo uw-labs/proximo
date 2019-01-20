@@ -102,11 +102,10 @@ func main() {
 			EnvVar: "PROXIMO_AMQP_ADDRESS",
 		})
 		cmd.Action = func() {
-			kh := &amqpHandler{
-				address: *address,
-			}
 			if enabled[consumeEndpoint] {
-				cHandler = kh
+				cHandler = &substrateConsumeHandler{
+					Initialiser: amqpInitialiser{address: *address},
+				}
 			}
 			if enabled[publishEndpoint] {
 				log.Fatal("publish endpoint not impelented by amqp backend")
