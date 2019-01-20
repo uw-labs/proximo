@@ -2,148 +2,16 @@ package main
 
 import (
 	"context"
-	"errors"
 	"io"
 	"strings"
-
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
-
-var (
-	errStartedTwice   = status.Error(codes.InvalidArgument, "consumption already started")
-	errInvalidConfirm = status.Error(codes.InvalidArgument, "invalid confirmation")
-	errNotConnected   = errors.New("not connected to a topic")
-	errInvalidRequest = status.Error(codes.InvalidArgument, "invalid consumer request - this is possibly a bug in your client library")
-)
-
-type consumerConfig struct {
-	consumer string
-	topic    string
-}
 
 type producerConfig struct {
 	topic string
 }
 
-type consumeHandler interface {
-	HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error
-}
-
 type produceHandler interface {
 	HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error
-}
-
-type consumeServer struct {
-	handler consumeHandler
-}
-
-func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
-	sCtx := stream.Context()
-	eg, ctx := errgroup.WithContext(sCtx)
-
-	forClient := make(chan *Message)
-	startRequest := make(chan *StartConsumeRequest)
-	confirmRequest := make(chan *Confirmation)
-
-	eg.Go(func() error {
-		return s.receiveFromClient(ctx, stream, startRequest, confirmRequest)
-	})
-
-	eg.Go(func() error {
-		return s.sendMessagesToClient(ctx, stream, forClient)
-	})
-
-	eg.Go(func() error {
-		var conf consumerConfig
-
-		select {
-		case sr := <-startRequest:
-			conf.topic = sr.GetTopic()
-			conf.consumer = sr.GetConsumer()
-		case <-ctx.Done():
-			return nil //ctx.Err()
-		}
-
-		if err := s.handler.HandleConsume(ctx, conf, forClient, confirmRequest); err != nil {
-			return err
-		}
-		return nil
-	})
-
-	if err := eg.Wait(); err != nil {
-		return err
-	}
-
-	if err := sCtx.Err(); err == context.Canceled {
-		return status.Error(codes.Canceled, err.Error())
-	}
-	return sCtx.Err()
-}
-
-type receiveConsumerStream interface {
-	Recv() (*ConsumerRequest, error)
-}
-
-func (s *consumeServer) receiveFromClient(ctx context.Context, stream receiveConsumerStream, startRequest chan<- *StartConsumeRequest, confirmRequest chan<- *Confirmation) error {
-	started := false
-	for {
-		msg, err := stream.Recv()
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			if strings.HasSuffix(err.Error(), "context canceled") {
-				return nil
-			}
-			return err
-		}
-		switch {
-		case msg.GetStartRequest() != nil:
-			if started {
-				return errStartedTwice
-			}
-			started = true
-			select {
-			case startRequest <- msg.GetStartRequest():
-			case <-ctx.Done():
-				return nil
-			}
-		case msg.GetConfirmation() != nil:
-			if !started {
-				return errInvalidConfirm
-			}
-			select {
-			case confirmRequest <- msg.GetConfirmation():
-			case <-ctx.Done():
-				return nil
-			}
-		default:
-			return errInvalidRequest
-		}
-	}
-}
-
-type sendConsumerStream interface {
-	Send(*Message) error
-}
-
-func (s *consumeServer) sendMessagesToClient(ctx context.Context, stream sendConsumerStream, forClient <-chan *Message) error {
-	for {
-		select {
-		case m := <-forClient:
-			err := stream.Send(m)
-			if err != nil {
-				if strings.HasSuffix(err.Error(), "context canceled") {
-					return nil
-				}
-				return err
-			}
-		case <-ctx.Done():
-			return nil
-		}
-	}
 }
 
 // messageSink_PublishServer is a subset of the auto-generated

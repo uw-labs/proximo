@@ -2,42 +2,69 @@ package main
 
 import (
 	"context"
+
+	"github.com/uw-labs/substrate"
 )
 
-func newMemHandler() *memHandler {
-	mh := &memHandler{
+func newMemBackend() *memBackend {
+	mh := &memBackend{
 		incomingMessages: make(chan *produceReq, 1024),
 		subs:             make(chan *sub, 1024),
-		last100:          make(map[string][]*Message),
+		last100:          make(map[string][]substrate.Message),
 	}
 	go mh.loop()
 	return mh
 }
 
-type memHandler struct {
+type memBackend struct {
 	incomingMessages chan *produceReq
 	subs             chan *sub
 
-	last100 map[string][]*Message
+	last100 map[string][]substrate.Message
 }
 
-func (h *memHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (h *memBackend) NewSource(req *StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+	return memSource{
+		backend: h,
+		req:     req,
+	}, nil
+}
+
+type memSource struct {
+	backend *memBackend
+	req     *StartConsumeRequest
+}
+
+func (s memSource) ConsumeMessages(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	h.subs <- &sub{conf.topic, conf.consumer, forClient, ctx}
+	s.backend.subs <- &sub{
+		topic:    s.req.GetTopic(),
+		consumer: s.req.GetConsumer(),
+		msgs:     messages,
+		ctx:      ctx,
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-confirmRequest:
+		case <-acks:
 			// drop
 		}
 	}
 }
 
-func (h *memHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (s memSource) Close() error {
+	return nil
+}
+
+func (s memSource) Status() (*substrate.Status, error) {
+	panic("not implemented")
+}
+
+func (h *memBackend) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -58,7 +85,7 @@ func (h *memHandler) HandleProduce(ctx context.Context, conf producerConfig, for
 	}
 }
 
-func (h memHandler) loop() {
+func (h memBackend) loop() {
 	subs := make(map[string]map[string][]*sub)
 
 	for {
@@ -87,7 +114,7 @@ func (h memHandler) loop() {
 						select {
 						case <-sub.ctx.Done():
 							// drop expired consumers
-						case sub.msgs <- &Message{inm.message.GetData(), generateID()}:
+						case sub.msgs <- &substrateMessage{inm.message.GetData()}:
 							remaining = append(remaining, sub)
 							sentOne = true
 						}
@@ -97,7 +124,7 @@ func (h memHandler) loop() {
 				}
 			}
 
-			h.last100[inm.topic] = append(h.last100[inm.topic], &Message{inm.message.GetData(), generateID()})
+			h.last100[inm.topic] = append(h.last100[inm.topic], &substrateMessage{inm.message.GetData()})
 			for len(h.last100[inm.topic]) > 100 {
 				h.last100[inm.topic] = h.last100[inm.topic][1:]
 			}
@@ -113,6 +140,14 @@ type produceReq struct {
 type sub struct {
 	topic    string
 	consumer string
-	msgs     chan<- *Message
+	msgs     chan<- substrate.Message
 	ctx      context.Context
+}
+
+type substrateMessage struct {
+	data []byte
+}
+
+func (m *substrateMessage) Data() []byte {
+	return m.data
 }

@@ -14,7 +14,7 @@ type amqpInitialiser struct {
 	address string
 }
 
-func (i amqpInitialiser) New(conf consumerConfig) (substrate.AsyncMessageSource, error) {
+func (i amqpInitialiser) NewSource(req *StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	conn, err := amqp.Dial(i.address)
 	if err != nil {
 		return nil, err
@@ -22,8 +22,8 @@ func (i amqpInitialiser) New(conf consumerConfig) (substrate.AsyncMessageSource,
 
 	return &amqpAsyncMessageSource{
 		address:  i.address,
-		topic:    conf.topic,
-		consumer: conf.consumer,
+		topic:    req.GetTopic(),
+		consumer: req.GetConsumer(),
 		conn:     conn,
 	}, nil
 }

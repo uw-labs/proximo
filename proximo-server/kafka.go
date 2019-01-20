@@ -14,10 +14,10 @@ type kafkaSourceInitialiser struct {
 	version *sarama.KafkaVersion
 }
 
-func (i kafkaSourceInitialiser) New(conf consumerConfig) (substrate.AsyncMessageSource, error) {
+func (i kafkaSourceInitialiser) NewSource(req *StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	return kafka.NewAsyncMessageSource(kafka.AsyncMessageSourceConfig{
-		ConsumerGroup: conf.consumer,
-		Topic:         conf.topic,
+		ConsumerGroup: req.GetConsumer(),
+		Topic:         req.GetTopic(),
 		Brokers:       i.brokers,
 		Version:       i.version,
 	})

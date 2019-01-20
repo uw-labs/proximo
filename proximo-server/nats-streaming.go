@@ -16,13 +16,13 @@ type natsStreamingSourceInitialiser struct {
 	maxInflight int
 }
 
-func (i natsStreamingSourceInitialiser) New(conf consumerConfig) (substrate.AsyncMessageSource, error) {
+func (i natsStreamingSourceInitialiser) NewSource(req *StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	return natsstreaming.NewAsyncMessageSource(natsstreaming.AsyncMessageSourceConfig{
 		URL:         i.url,
 		ClusterID:   i.clusterID,
 		ClientID:    "proximo-nats-streaming-" + generateID(),
-		Subject:     conf.topic,
-		QueueGroup:  conf.consumer,
+		Subject:     req.GetTopic(),
+		QueueGroup:  req.GetConsumer(),
 		MaxInFlight: i.maxInflight,
 	})
 }

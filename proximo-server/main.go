@@ -25,9 +25,9 @@ const (
 
 func main() {
 	var (
-		cHandler consumeHandler
-		pHandler produceHandler
-		enabled  map[string]bool
+		sourceInit SourceInitialiser
+		pHandler   produceHandler
+		enabled    map[string]bool
 	)
 
 	app := cli.App("proximo", "GRPC Proxy gateway for message queue systems")
@@ -76,11 +76,9 @@ func main() {
 			}
 
 			if enabled[consumeEndpoint] {
-				cHandler = &substrateConsumeHandler{
-					Initialiser: kafkaSourceInitialiser{
-						brokers: brokers,
-						version: version,
-					},
+				sourceInit = kafkaSourceInitialiser{
+					brokers: brokers,
+					version: version,
 				}
 			}
 			if enabled[publishEndpoint] {
@@ -103,9 +101,7 @@ func main() {
 		})
 		cmd.Action = func() {
 			if enabled[consumeEndpoint] {
-				cHandler = &substrateConsumeHandler{
-					Initialiser: amqpInitialiser{address: *address},
-				}
+				sourceInit = amqpInitialiser{address: *address}
 			}
 			if enabled[publishEndpoint] {
 				log.Fatal("publish endpoint not impelented by amqp backend")
@@ -135,12 +131,10 @@ func main() {
 		})
 		cmd.Action = func() {
 			if enabled[consumeEndpoint] {
-				cHandler = substrateConsumeHandler{
-					Initialiser: natsStreamingSourceInitialiser{
-						url:         *url,
-						clusterID:   *cid,
-						maxInflight: *maxInflight,
-					},
+				sourceInit = natsStreamingSourceInitialiser{
+					url:         *url,
+					clusterID:   *cid,
+					maxInflight: *maxInflight,
 				}
 			}
 			if enabled[publishEndpoint] {
@@ -158,10 +152,10 @@ func main() {
 
 	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
 		cmd.Action = func() {
-			h := newMemHandler()
+			h := newMemBackend()
 
 			if enabled[consumeEndpoint] {
-				cHandler = h
+				sourceInit = h
 			}
 			if enabled[publishEndpoint] {
 				pHandler = h
@@ -174,7 +168,7 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
-	log.Fatal(listenAndServe(cHandler, pHandler, *port))
+	log.Fatal(listenAndServe(sourceInit, pHandler, *port))
 }
 
 func parseEndpoints(endpoints string) map[string]bool {
@@ -192,7 +186,7 @@ func parseEndpoints(endpoints string) map[string]bool {
 
 	return enabled
 }
-func listenAndServe(cHandler consumeHandler, pHandler produceHandler, port int) error {
+func listenAndServe(sourceInit SourceInitialiser, pHandler produceHandler, port int) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return errors.Wrap(err, "failed to listen")
@@ -207,8 +201,8 @@ func listenAndServe(cHandler consumeHandler, pHandler produceHandler, port int) 
 	grpcServer := grpc.NewServer(opts...)
 	defer grpcServer.Stop()
 
-	if cHandler != nil {
-		RegisterMessageSourceServer(grpcServer, &consumeServer{handler: cHandler})
+	if sourceInit != nil {
+		RegisterMessageSourceServer(grpcServer, &consumeServer{initialiser: sourceInit})
 	}
 	if pHandler != nil {
 		RegisterMessageSinkServer(grpcServer, &produceServer{handler: pHandler})
