@@ -16,7 +16,7 @@ type natsStreamingSourceInitialiser struct {
 	maxInflight int
 }
 
-func (i natsStreamingSourceInitialiser) NewSource(req *StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+func (i natsStreamingSourceInitialiser) NewSource(ctx context.Context, req *StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	return natsstreaming.NewAsyncMessageSource(natsstreaming.AsyncMessageSourceConfig{
 		URL:         i.url,
 		ClusterID:   i.clusterID,

@@ -14,7 +14,7 @@ type kafkaSourceInitialiser struct {
 	version *sarama.KafkaVersion
 }
 
-func (i kafkaSourceInitialiser) NewSource(req *StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+func (i kafkaSourceInitialiser) NewSource(ctx context.Context, req *StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	return kafka.NewAsyncMessageSource(kafka.AsyncMessageSourceConfig{
 		ConsumerGroup: req.GetConsumer(),
 		Topic:         req.GetTopic(),

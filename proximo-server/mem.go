@@ -23,7 +23,7 @@ type memBackend struct {
 	last100 map[string][]substrate.Message
 }
 
-func (h *memBackend) NewSource(req *StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+func (h *memBackend) NewSource(ctx context.Context, req *StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	return memSource{
 		backend: h,
 		req:     req,

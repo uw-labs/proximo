@@ -23,7 +23,7 @@ var (
 // SourceInitialiser is an object that initialises `substrate.AsyncMessageSource`
 // based on provided `StartConsumeRequest`.
 type SourceInitialiser interface {
-	NewSource(req *StartConsumeRequest) (substrate.AsyncMessageSource, error)
+	NewSource(ctx context.Context, req *StartConsumeRequest) (substrate.AsyncMessageSource, error)
 }
 
 // consumeServer implements the MessageSourceServer interface
@@ -78,7 +78,7 @@ func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
 			return nil
 		}
 
-		source, err := s.initialiser.NewSource(req)
+		source, err := s.initialiser.NewSource(ctx, req)
 		if err != nil {
 			return err
 		}
