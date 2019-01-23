@@ -82,9 +82,11 @@ func main() {
 				}
 			}
 			if enabled[publishEndpoint] {
-				pHandler = &kafkaProduceHandler{
-					brokers: brokers,
-					version: version,
+				pHandler = substrateProduceHandler{
+					Initialiser: kafkaSinkInitialiser{
+						brokers: brokers,
+						version: version,
+					},
 				}
 			}
 
