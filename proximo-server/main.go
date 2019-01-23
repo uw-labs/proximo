@@ -19,6 +19,10 @@ import (
 
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/proximo/server"
+	"github.com/uw-labs/proximo/server/amqp"
+	"github.com/uw-labs/proximo/server/kafka"
+	"github.com/uw-labs/proximo/server/mem"
+	"github.com/uw-labs/proximo/server/natsstreaming"
 )
 
 const (
@@ -79,15 +83,15 @@ func main() {
 			}
 
 			if enabled[consumeEndpoint] {
-				sourceInit = kafkaSourceInitialiser{
-					brokers: brokers,
-					version: version,
+				sourceInit = kafka.SourceInitialiser{
+					Brokers: brokers,
+					Version: version,
 				}
 			}
 			if enabled[publishEndpoint] {
-				sinkInit = kafkaSinkInitialiser{
-					brokers: brokers,
-					version: version,
+				sinkInit = kafka.SinkInitialiser{
+					Brokers: brokers,
+					Version: version,
 				}
 			}
 
@@ -104,7 +108,7 @@ func main() {
 		})
 		cmd.Action = func() {
 			if enabled[consumeEndpoint] {
-				sourceInit = amqpInitialiser{address: *address}
+				sourceInit = amqp.SourceInitialiser{Address: *address}
 			}
 			if enabled[publishEndpoint] {
 				log.Fatal("publish endpoint not impelented by amqp backend")
@@ -134,16 +138,16 @@ func main() {
 		})
 		cmd.Action = func() {
 			if enabled[consumeEndpoint] {
-				sourceInit = natsStreamingSourceInitialiser{
-					url:         *url,
-					clusterID:   *cid,
-					maxInflight: *maxInflight,
+				sourceInit = natsstreaming.SourceInitialiser{
+					URL:         *url,
+					ClusterID:   *cid,
+					MaxInflight: *maxInflight,
 				}
 			}
 			if enabled[publishEndpoint] {
-				sinkInit = natsStreamingSinkInitialiser{
-					url:       *url,
-					clusterID: *cid,
+				sinkInit = natsstreaming.SinkInitialiser{
+					URL:       *url,
+					ClusterID: *cid,
 				}
 			}
 
@@ -153,7 +157,7 @@ func main() {
 
 	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
 		cmd.Action = func() {
-			b := newMemBackend()
+			b := mem.NewBackend()
 
 			if enabled[consumeEndpoint] {
 				sourceInit = b

@@ -1,4 +1,4 @@
-package main
+package amqp
 
 import (
 	"context"
@@ -7,22 +7,25 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/streadway/amqp"
-	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
+
+	"github.com/uw-labs/proximo/proto"
 )
 
-type amqpInitialiser struct {
-	address string
+// SourceInitialiser is an implementation of the `server.SourceInitialiserInterface`
+// that initialises substrate source for AMQP
+type SourceInitialiser struct {
+	Address string
 }
 
-func (i amqpInitialiser) NewSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
-	conn, err := amqp.Dial(i.address)
+func (i SourceInitialiser) NewSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+	conn, err := amqp.Dial(i.Address)
 	if err != nil {
 		return nil, err
 	}
 
 	return &amqpAsyncMessageSource{
-		address:  i.address,
+		address:  i.Address,
 		topic:    req.GetTopic(),
 		consumer: req.GetConsumer(),
 		conn:     conn,

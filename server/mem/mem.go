@@ -1,15 +1,16 @@
-package main
+package mem
 
 import (
 	"context"
 
-	"github.com/uw-labs/proximo/proto"
-
 	"github.com/uw-labs/substrate"
+
+	"github.com/uw-labs/proximo/proto"
 )
 
-func newMemBackend() *memBackend {
-	mh := &memBackend{
+// NewBackend returns and starts a new instance of the in memory backend.
+func NewBackend() *Backend {
+	mh := &Backend{
 		incomingMessages: make(chan *produceReq, 1024),
 		subs:             make(chan *sub, 1024),
 		last100:          make(map[string][]substrate.Message),
@@ -18,21 +19,25 @@ func newMemBackend() *memBackend {
 	return mh
 }
 
-type memBackend struct {
+// Backend is an in memory implementation of a message queue. It implements
+// both `server.SourceInitialiser` and `server.SinkInitialiser` interfaces.
+// The exposed functions return substrate clients that use given instance
+// of this object.
+type Backend struct {
 	incomingMessages chan *produceReq
 	subs             chan *sub
 
 	last100 map[string][]substrate.Message
 }
 
-func (h *memBackend) NewSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+func (h *Backend) NewSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	return memSource{
 		backend: h,
 		req:     req,
 	}, nil
 }
 
-func (h *memBackend) NewSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
+func (h *Backend) NewSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return memSink{
 		backend: h,
 		req:     req,
@@ -40,7 +45,7 @@ func (h *memBackend) NewSink(ctx context.Context, req *proto.StartPublishRequest
 }
 
 type memSource struct {
-	backend *memBackend
+	backend *Backend
 	req     *proto.StartConsumeRequest
 }
 
@@ -74,7 +79,7 @@ func (s memSource) Status() (*substrate.Status, error) {
 }
 
 type memSink struct {
-	backend *memBackend
+	backend *Backend
 	req     *proto.StartPublishRequest
 }
 
@@ -106,7 +111,7 @@ func (s memSink) Status() (*substrate.Status, error) {
 	panic("not implemented")
 }
 
-func (h memBackend) loop() {
+func (h Backend) loop() {
 	subs := make(map[string]map[string][]*sub)
 
 	for {
