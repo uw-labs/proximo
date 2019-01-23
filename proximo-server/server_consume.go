@@ -84,10 +84,7 @@ func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
 		}
 		defer source.Close()
 
-		if err := source.ConsumeMessages(ctx, messages, acks); err != nil {
-			return err
-		}
-		return nil
+		return source.ConsumeMessages(ctx, messages, acks)
 	})
 
 	if err := eg.Wait(); err != nil {

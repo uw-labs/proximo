@@ -26,7 +26,7 @@ const (
 func main() {
 	var (
 		sourceInit SourceInitialiser
-		pHandler   produceHandler
+		sinkInit   SinkInitialiser
 		enabled    map[string]bool
 	)
 
@@ -82,11 +82,9 @@ func main() {
 				}
 			}
 			if enabled[publishEndpoint] {
-				pHandler = substrateProduceHandler{
-					Initialiser: kafkaSinkInitialiser{
-						brokers: brokers,
-						version: version,
-					},
+				sinkInit = kafkaSinkInitialiser{
+					brokers: brokers,
+					version: version,
 				}
 			}
 
@@ -140,11 +138,9 @@ func main() {
 				}
 			}
 			if enabled[publishEndpoint] {
-				pHandler = substrateProduceHandler{
-					Initialiser: natsStreamingSinkInitialiser{
-						url:       *url,
-						clusterID: *cid,
-					},
+				sinkInit = natsStreamingSinkInitialiser{
+					url:       *url,
+					clusterID: *cid,
 				}
 			}
 
@@ -154,13 +150,13 @@ func main() {
 
 	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
 		cmd.Action = func() {
-			h := newMemBackend()
+			b := newMemBackend()
 
 			if enabled[consumeEndpoint] {
-				sourceInit = h
+				sourceInit = b
 			}
 			if enabled[publishEndpoint] {
-				pHandler = h
+				sinkInit = b
 			}
 
 			log.Printf("Using in memory testing backend")
@@ -170,7 +166,7 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
-	log.Fatal(listenAndServe(sourceInit, pHandler, *port))
+	log.Fatal(listenAndServe(sourceInit, sinkInit, *port))
 }
 
 func parseEndpoints(endpoints string) map[string]bool {
@@ -188,7 +184,8 @@ func parseEndpoints(endpoints string) map[string]bool {
 
 	return enabled
 }
-func listenAndServe(sourceInit SourceInitialiser, pHandler produceHandler, port int) error {
+
+func listenAndServe(sourceInit SourceInitialiser, sinkInit SinkInitialiser, port int) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return errors.Wrap(err, "failed to listen")
@@ -206,8 +203,8 @@ func listenAndServe(sourceInit SourceInitialiser, pHandler produceHandler, port 
 	if sourceInit != nil {
 		RegisterMessageSourceServer(grpcServer, &consumeServer{initialiser: sourceInit})
 	}
-	if pHandler != nil {
-		RegisterMessageSinkServer(grpcServer, &produceServer{handler: pHandler})
+	if sinkInit != nil {
+		RegisterMessageSinkServer(grpcServer, &produceServer{initialiser: sinkInit})
 	}
 
 	errCh := make(chan error, 1)

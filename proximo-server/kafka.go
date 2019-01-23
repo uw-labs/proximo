@@ -27,9 +27,9 @@ type kafkaSinkInitialiser struct {
 	version *sarama.KafkaVersion
 }
 
-func (i kafkaSinkInitialiser) New(conf producerConfig) (substrate.AsyncMessageSink, error) {
+func (i kafkaSinkInitialiser) NewSink(ctx context.Context, req *StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
-		Topic:   conf.topic,
+		Topic:   req.GetTopic(),
 		Brokers: i.brokers,
 		Version: i.version,
 	})

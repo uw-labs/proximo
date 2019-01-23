@@ -8,18 +8,29 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/pkg/errors"
+	"github.com/uw-labs/substrate"
 )
 
-type producerConfig struct {
-	topic string
+// SinkInitialiser is an object that initialises `substrate.AsyncMessageSink`
+// based on provided `PublisherRequest`.
+type SinkInitialiser interface {
+	NewSink(ctx context.Context, req *StartPublishRequest) (substrate.AsyncMessageSink, error)
 }
 
-type produceHandler interface {
-	HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error
-}
-
+// produceServer implements the MessageSinkServer interface
 type produceServer struct {
-	handler produceHandler
+	initialiser SinkInitialiser
+}
+
+// substrateMessage is a wrapper around proximo message that implements the substrate.Message interface
+type substrateMessage struct {
+	proximoMsg *Message
+}
+
+func (msg *substrateMessage) Data() []byte {
+	return msg.proximoMsg.GetData()
 }
 
 // receiveProducerStream is a subset of the MessageSink_PublishServer interface
@@ -38,30 +49,35 @@ func (s *produceServer) Publish(stream MessageSink_PublishServer) error {
 	sCtx := stream.Context()
 	eg, ctx := errgroup.WithContext(sCtx)
 
-	messages := make(chan *Message)
 	startRequest := make(chan *StartPublishRequest)
 
-	forClient := make(chan *Confirmation)
+	acks := make(chan substrate.Message)
+	messages := make(chan substrate.Message)
 
 	eg.Go(func() error {
 		return s.receiveFromClient(ctx, stream, startRequest, messages)
 	})
 
 	eg.Go(func() error {
-		return s.sendAcksToClient(ctx, stream, forClient)
+		return s.sendAcksToClient(ctx, stream, acks)
 	})
 
 	eg.Go(func() error {
-		var conf producerConfig
+		var req *StartPublishRequest
 
 		select {
 		case <-ctx.Done():
 			return nil
-		case sr := <-startRequest:
-			conf.topic = sr.GetTopic()
+		case req = <-startRequest:
 		}
 
-		return s.handler.HandleProduce(ctx, conf, forClient, messages)
+		sink, err := s.initialiser.NewSink(ctx, req)
+		if err != nil {
+			return err
+		}
+		defer sink.Close()
+
+		return sink.PublishMessages(ctx, acks, messages)
 	})
 
 	if err := eg.Wait(); err != nil {
@@ -74,7 +90,7 @@ func (s *produceServer) Publish(stream MessageSink_PublishServer) error {
 	return sCtx.Err()
 }
 
-func (s *produceServer) receiveFromClient(ctx context.Context, stream receiveProducerStream, startRequest chan<- *StartPublishRequest, messages chan<- *Message) error {
+func (s *produceServer) receiveFromClient(ctx context.Context, stream receiveProducerStream, startRequest chan<- *StartPublishRequest, toSubstrate chan<- substrate.Message) error {
 	started := false
 	for {
 		msg, err := stream.Recv()
@@ -98,20 +114,24 @@ func (s *produceServer) receiveFromClient(ctx context.Context, stream receivePro
 			if !started {
 				return errNotConnected
 			}
-			messages <- msg.GetMsg()
+			toSubstrate <- &substrateMessage{proximoMsg: msg.GetMsg()}
 		default:
 			return errInvalidRequest
 		}
 	}
 }
 
-func (s *produceServer) sendAcksToClient(ctx context.Context, stream sendProducerStream, forClient <-chan *Confirmation) error {
+func (s *produceServer) sendAcksToClient(ctx context.Context, stream sendProducerStream, fromSubstrate <-chan substrate.Message) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case msg := <-forClient:
-			if err := stream.Send(msg); err != nil {
+		case ackMsg := <-fromSubstrate:
+			sMsg, ok := ackMsg.(*substrateMessage)
+			if !ok {
+				return errors.Errorf("wrong message type from substrate - message: %s", sMsg)
+			}
+			if err := stream.Send(&Confirmation{MsgID: sMsg.proximoMsg.Id}); err != nil {
 				return err
 			}
 		}

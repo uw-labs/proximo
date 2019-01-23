@@ -29,11 +29,11 @@ type natsStreamingSinkInitialiser struct {
 	clusterID string
 }
 
-func (i natsStreamingSinkInitialiser) New(conf producerConfig) (substrate.AsyncMessageSink, error) {
+func (i natsStreamingSinkInitialiser) NewSink(ctx context.Context, req *StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return natsstreaming.NewAsyncMessageSink(natsstreaming.AsyncMessageSinkConfig{
 		URL:       i.url,
 		ClusterID: i.clusterID,
 		ClientID:  "proximo-nats-streaming-" + generateID(),
-		Subject:   conf.topic,
+		Subject:   req.GetTopic(),
 	})
 }

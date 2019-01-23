@@ -30,6 +30,13 @@ func (h *memBackend) NewSource(ctx context.Context, req *StartConsumeRequest) (s
 	}, nil
 }
 
+func (h *memBackend) NewSink(ctx context.Context, req *StartPublishRequest) (substrate.AsyncMessageSink, error) {
+	return memSink{
+		backend: h,
+		req:     req,
+	}, nil
+}
+
 type memSource struct {
 	backend *memBackend
 	req     *StartConsumeRequest
@@ -64,16 +71,21 @@ func (s memSource) Status() (*substrate.Status, error) {
 	panic("not implemented")
 }
 
-func (h *memBackend) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
+type memSink struct {
+	backend *memBackend
+	req     *StartPublishRequest
+}
+
+func (s memSink) PublishMessages(ctx context.Context, acks chan<- substrate.Message, messages <-chan substrate.Message) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case msg := <-messages:
 			select {
-			case h.incomingMessages <- &produceReq{conf.topic, msg}:
+			case s.backend.incomingMessages <- &produceReq{topic: s.req.Topic, message: msg}:
 				select {
-				case forClient <- &Confirmation{MsgID: msg.GetId()}:
+				case acks <- msg:
 				case <-ctx.Done():
 					return nil
 				}
@@ -81,8 +93,15 @@ func (h *memBackend) HandleProduce(ctx context.Context, conf producerConfig, for
 				return nil
 			}
 		}
-
 	}
+}
+
+func (s memSink) Close() error {
+	return nil
+}
+
+func (s memSink) Status() (*substrate.Status, error) {
+	panic("not implemented")
 }
 
 func (h memBackend) loop() {
@@ -114,7 +133,7 @@ func (h memBackend) loop() {
 						select {
 						case <-sub.ctx.Done():
 							// drop expired consumers
-						case sub.msgs <- &substrateMessage{proximoMsg: inm.message}:
+						case sub.msgs <- inm.message:
 							remaining = append(remaining, sub)
 							sentOne = true
 						}
@@ -124,7 +143,7 @@ func (h memBackend) loop() {
 				}
 			}
 
-			h.last100[inm.topic] = append(h.last100[inm.topic], &substrateMessage{proximoMsg: inm.message})
+			h.last100[inm.topic] = append(h.last100[inm.topic], inm.message)
 			for len(h.last100[inm.topic]) > 100 {
 				h.last100[inm.topic] = h.last100[inm.topic][1:]
 			}
@@ -134,7 +153,7 @@ func (h memBackend) loop() {
 
 type produceReq struct {
 	topic   string
-	message *Message
+	message substrate.Message
 }
 
 type sub struct {
