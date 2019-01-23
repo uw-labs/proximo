@@ -10,23 +10,24 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/pkg/errors"
+	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
 )
 
 // SinkInitialiser is an object that initialises `substrate.AsyncMessageSink`
 // based on provided `PublisherRequest`.
 type SinkInitialiser interface {
-	NewSink(ctx context.Context, req *StartPublishRequest) (substrate.AsyncMessageSink, error)
+	NewSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error)
 }
 
-// produceServer implements the MessageSinkServer interface
-type produceServer struct {
-	initialiser SinkInitialiser
+// ProduceServer implements the MessageSinkServer interface
+type ProduceServer struct {
+	Initialiser SinkInitialiser
 }
 
 // substrateMessage is a wrapper around proximo message that implements the substrate.Message interface
 type substrateMessage struct {
-	proximoMsg *Message
+	proximoMsg *proto.Message
 }
 
 func (msg *substrateMessage) Data() []byte {
@@ -36,20 +37,20 @@ func (msg *substrateMessage) Data() []byte {
 // receiveProducerStream is a subset of the MessageSink_PublishServer interface
 // that only exposes the receive function
 type receiveProducerStream interface {
-	Recv() (*PublisherRequest, error)
+	Recv() (*proto.PublisherRequest, error)
 }
 
 // sendProducerStream is a subset of the MessageSink_PublishServer interface
 // that only exposes the send function
 type sendProducerStream interface {
-	Send(*Confirmation) error
+	Send(*proto.Confirmation) error
 }
 
-func (s *produceServer) Publish(stream MessageSink_PublishServer) error {
+func (s *ProduceServer) Publish(stream proto.MessageSink_PublishServer) error {
 	sCtx := stream.Context()
 	eg, ctx := errgroup.WithContext(sCtx)
 
-	startRequest := make(chan *StartPublishRequest)
+	startRequest := make(chan *proto.StartPublishRequest)
 
 	acks := make(chan substrate.Message)
 	messages := make(chan substrate.Message)
@@ -63,7 +64,7 @@ func (s *produceServer) Publish(stream MessageSink_PublishServer) error {
 	})
 
 	eg.Go(func() error {
-		var req *StartPublishRequest
+		var req *proto.StartPublishRequest
 
 		select {
 		case <-ctx.Done():
@@ -71,7 +72,7 @@ func (s *produceServer) Publish(stream MessageSink_PublishServer) error {
 		case req = <-startRequest:
 		}
 
-		sink, err := s.initialiser.NewSink(ctx, req)
+		sink, err := s.Initialiser.NewSink(ctx, req)
 		if err != nil {
 			return err
 		}
@@ -90,7 +91,7 @@ func (s *produceServer) Publish(stream MessageSink_PublishServer) error {
 	return sCtx.Err()
 }
 
-func (s *produceServer) receiveFromClient(ctx context.Context, stream receiveProducerStream, startRequest chan<- *StartPublishRequest, toSubstrate chan<- substrate.Message) error {
+func (s *ProduceServer) receiveFromClient(ctx context.Context, stream receiveProducerStream, startRequest chan<- *proto.StartPublishRequest, toSubstrate chan<- substrate.Message) error {
 	started := false
 	for {
 		msg, err := stream.Recv()
@@ -129,7 +130,7 @@ func (s *produceServer) receiveFromClient(ctx context.Context, stream receivePro
 	}
 }
 
-func (s *produceServer) sendAcksToClient(ctx context.Context, stream sendProducerStream, fromSubstrate <-chan substrate.Message) error {
+func (s *ProduceServer) sendAcksToClient(ctx context.Context, stream sendProducerStream, fromSubstrate <-chan substrate.Message) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -139,7 +140,7 @@ func (s *produceServer) sendAcksToClient(ctx context.Context, stream sendProduce
 			if !ok {
 				return errors.Errorf("wrong message type from substrate - message: %s", sMsg)
 			}
-			if err := stream.Send(&Confirmation{MsgID: sMsg.proximoMsg.Id}); err != nil {
+			if err := stream.Send(&proto.Confirmation{MsgID: sMsg.proximoMsg.Id}); err != nil {
 				return err
 			}
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Shopify/sarama"
+	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
 	"github.com/uw-labs/substrate/kafka"
 )
@@ -13,7 +14,7 @@ type kafkaSourceInitialiser struct {
 	version *sarama.KafkaVersion
 }
 
-func (i kafkaSourceInitialiser) NewSource(ctx context.Context, req *StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+func (i kafkaSourceInitialiser) NewSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	return kafka.NewAsyncMessageSource(kafka.AsyncMessageSourceConfig{
 		ConsumerGroup: req.GetConsumer(),
 		Topic:         req.GetTopic(),
@@ -27,7 +28,7 @@ type kafkaSinkInitialiser struct {
 	version *sarama.KafkaVersion
 }
 
-func (i kafkaSinkInitialiser) NewSink(ctx context.Context, req *StartPublishRequest) (substrate.AsyncMessageSink, error) {
+func (i kafkaSinkInitialiser) NewSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
 		Topic:   req.GetTopic(),
 		Brokers: i.brokers,

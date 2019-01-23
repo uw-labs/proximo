@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/streadway/amqp"
+	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
 )
 
@@ -14,7 +15,7 @@ type amqpInitialiser struct {
 	address string
 }
 
-func (i amqpInitialiser) NewSource(ctx context.Context, req *StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+func (i amqpInitialiser) NewSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	conn, err := amqp.Dial(i.address)
 	if err != nil {
 		return nil, err

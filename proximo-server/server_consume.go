@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/gofrs/uuid"
+	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
 )
 
@@ -23,12 +24,12 @@ var (
 // SourceInitialiser is an object that initialises `substrate.AsyncMessageSource`
 // based on provided `StartConsumeRequest`.
 type SourceInitialiser interface {
-	NewSource(ctx context.Context, req *StartConsumeRequest) (substrate.AsyncMessageSource, error)
+	NewSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error)
 }
 
-// consumeServer implements the MessageSourceServer interface
-type consumeServer struct {
-	initialiser SourceInitialiser
+// ConsumeServer implements the MessageSourceServer interface
+type ConsumeServer struct {
+	Initialiser SourceInitialiser
 }
 
 // ackMessage is a mapping from substrate message to proximo message id
@@ -40,21 +41,21 @@ type ackMessage struct {
 // receiveConsumerStream is a subset of the MessageSource_ConsumeServer interface
 // that only exposes the receive function
 type receiveConsumerStream interface {
-	Recv() (*ConsumerRequest, error)
+	Recv() (*proto.ConsumerRequest, error)
 }
 
 // sendConsumerStream is a subset of the MessageSource_ConsumeServer interface
 // that only exposes the send function
 type sendConsumerStream interface {
-	Send(*Message) error
+	Send(*proto.Message) error
 }
 
-func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
+func (s *ConsumeServer) Consume(stream proto.MessageSource_ConsumeServer) error {
 	sCtx := stream.Context()
 	eg, ctx := errgroup.WithContext(sCtx)
 
-	startRequest := make(chan *StartConsumeRequest)
-	confirmations := make(chan *Confirmation)
+	startRequest := make(chan *proto.StartConsumeRequest)
+	confirmations := make(chan *proto.Confirmation)
 
 	toAck := make(chan *ackMessage)
 	acks := make(chan substrate.Message)
@@ -70,7 +71,7 @@ func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
 		return s.passAcksToSubstrate(ctx, confirmations, acks, toAck)
 	})
 	eg.Go(func() error {
-		var req *StartConsumeRequest
+		var req *proto.StartConsumeRequest
 
 		select {
 		case req = <-startRequest:
@@ -78,7 +79,7 @@ func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
 			return nil
 		}
 
-		source, err := s.initialiser.NewSource(ctx, req)
+		source, err := s.Initialiser.NewSource(ctx, req)
 		if err != nil {
 			return err
 		}
@@ -100,7 +101,7 @@ func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
 	return sCtx.Err()
 }
 
-func (s *consumeServer) receiveFromClient(ctx context.Context, stream receiveConsumerStream, startRequest chan<- *StartConsumeRequest, confirmRequest chan<- *Confirmation) error {
+func (s *ConsumeServer) receiveFromClient(ctx context.Context, stream receiveConsumerStream, startRequest chan<- *proto.StartConsumeRequest, confirmRequest chan<- *proto.Confirmation) error {
 	started := false
 
 	for {
@@ -141,7 +142,7 @@ func (s *consumeServer) receiveFromClient(ctx context.Context, stream receiveCon
 	}
 }
 
-func (s *consumeServer) sendMessagesToClient(ctx context.Context, stream sendConsumerStream, fromSubstrate <-chan substrate.Message, toAck chan<- *ackMessage) error {
+func (s *ConsumeServer) sendMessagesToClient(ctx context.Context, stream sendConsumerStream, fromSubstrate <-chan substrate.Message, toAck chan<- *ackMessage) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -151,7 +152,7 @@ func (s *consumeServer) sendMessagesToClient(ctx context.Context, stream sendCon
 				id:           uuid.Must(uuid.NewV4()).String(),
 				substrateMsg: sMsg,
 			}
-			pMsg := &Message{
+			pMsg := &proto.Message{
 				Id: ackMsg.id,
 				// Read the data now so that we can safely discard the payload
 				// once the message is passed to the ack handler.
@@ -173,7 +174,7 @@ func (s *consumeServer) sendMessagesToClient(ctx context.Context, stream sendCon
 	}
 }
 
-func (s *consumeServer) passAcksToSubstrate(ctx context.Context, fromClient <-chan *Confirmation, toSubstrate chan<- substrate.Message, toAck <-chan *ackMessage) error {
+func (s *ConsumeServer) passAcksToSubstrate(ctx context.Context, fromClient <-chan *proto.Confirmation, toSubstrate chan<- substrate.Message, toAck <-chan *ackMessage) error {
 	ackMap := make(map[string]substrate.Message)
 
 	for {

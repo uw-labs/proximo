@@ -14,6 +14,7 @@ import (
 	cli "github.com/jawher/mow.cli"
 	"github.com/nats-io/go-nats-streaming"
 	"github.com/pkg/errors"
+	"github.com/uw-labs/proximo/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 )
@@ -201,10 +202,10 @@ func listenAndServe(sourceInit SourceInitialiser, sinkInit SinkInitialiser, port
 	defer grpcServer.Stop()
 
 	if sourceInit != nil {
-		RegisterMessageSourceServer(grpcServer, &consumeServer{initialiser: sourceInit})
+		proto.RegisterMessageSourceServer(grpcServer, &ConsumeServer{Initialiser: sourceInit})
 	}
 	if sinkInit != nil {
-		RegisterMessageSinkServer(grpcServer, &produceServer{initialiser: sinkInit})
+		proto.RegisterMessageSinkServer(grpcServer, &ProduceServer{Initialiser: sinkInit})
 	}
 
 	errCh := make(chan error, 1)

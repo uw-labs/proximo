@@ -16,7 +16,7 @@ It has these top-level messages:
 	PublisherRequest
 	StartPublishRequest
 */
-package main
+package proto
 
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
