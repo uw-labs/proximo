@@ -4,6 +4,10 @@ import (
 	"context"
 	"io"
 	"strings"
+
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type producerConfig struct {
@@ -14,99 +18,82 @@ type produceHandler interface {
 	HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error
 }
 
-// messageSink_PublishServer is a subset of the auto-generated
-// MessageSink_PublishServer interface and makes things easier in tests.
-type messageSink_PublishServer interface {
-	Send(*Confirmation) error
-	Recv() (*PublisherRequest, error)
-	Context() context.Context
-}
-
 type produceServer struct {
 	handler produceHandler
 }
 
 func (s *produceServer) Publish(stream MessageSink_PublishServer) error {
-	return s.publish(stream)
-}
-
-func (s *produceServer) publish(stream messageSink_PublishServer) error {
-
-	ctx, cancel := context.WithCancel(stream.Context())
-	defer cancel()
+	sCtx := stream.Context()
+	eg, ctx := errgroup.WithContext(sCtx)
 
 	startRequest := make(chan *StartPublishRequest)
 	messages := make(chan *Message)
-	errors := make(chan error, 3)
 
-	go func() {
+	eg.Go(func() error {
 		started := false
 		for {
 			msg, err := stream.Recv()
 			if err != nil {
 				if err == io.EOF {
-					return
+					return nil
 				}
 				if strings.HasSuffix(err.Error(), "context canceled") {
-					return
+					return nil
 				}
-				errors <- err
-				return
+				return err
 			}
 			switch {
 			case msg.GetStartRequest() != nil:
 				if started {
-					errors <- errStartedTwice
-					return
+					return errStartedTwice
 				}
 				startRequest <- msg.GetStartRequest()
 				started = true
 			case msg.GetMsg() != nil:
 				if !started {
-					errors <- errNotConnected
-					return
+					return errNotConnected
 				}
 				messages <- msg.GetMsg()
+			default:
+				return errInvalidRequest
 			}
 		}
-	}()
-
-	var topic string
-
-	select {
-	case sr := <-startRequest:
-		topic = sr.GetTopic()
-	case <-ctx.Done():
-		return nil //ctx.Err()
-	}
+	})
 
 	forClient := make(chan *Confirmation)
 
-	go func() {
-		for m := range forClient {
-			err := stream.Send(m)
-			if err != nil {
-				errors <- err
-				return
+	eg.Go(func() error {
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case msg := <-forClient:
+				if err := stream.Send(msg); err != nil {
+					return err
+				}
 			}
 		}
-	}()
+	})
 
-	go func() {
-		defer close(forClient)
-		conf := producerConfig{
-			topic: topic,
-		}
-		err := s.handler.HandleProduce(ctx, conf, forClient, messages)
-		if err != nil {
-			errors <- err
-		}
-	}()
+	eg.Go(func() error {
+		var conf producerConfig
 
-	select {
-	case err := <-errors:
+		select {
+		case <-ctx.Done():
+			return nil
+		case sr := <-startRequest:
+			conf.topic = sr.GetTopic()
+		}
+
+		return s.handler.HandleProduce(ctx, conf, forClient, messages)
+	})
+
+	if err := eg.Wait(); err != nil {
 		return err
-	case <-ctx.Done():
-		return nil
 	}
+
+	if err := sCtx.Err(); err == context.Canceled {
+		return status.Error(codes.Canceled, err.Error())
+	}
+	return sCtx.Err()
 }
