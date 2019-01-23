@@ -14,9 +14,11 @@ import (
 	cli "github.com/jawher/mow.cli"
 	"github.com/nats-io/go-nats-streaming"
 	"github.com/pkg/errors"
-	"github.com/uw-labs/proximo/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+
+	"github.com/uw-labs/proximo/proto"
+	"github.com/uw-labs/proximo/server"
 )
 
 const (
@@ -26,8 +28,8 @@ const (
 
 func main() {
 	var (
-		sourceInit SourceInitialiser
-		sinkInit   SinkInitialiser
+		sourceInit server.SourceInitialiser
+		sinkInit   server.SinkInitialiser
 		enabled    map[string]bool
 	)
 
@@ -186,7 +188,7 @@ func parseEndpoints(endpoints string) map[string]bool {
 	return enabled
 }
 
-func listenAndServe(sourceInit SourceInitialiser, sinkInit SinkInitialiser, port int) error {
+func listenAndServe(sourceInit server.SourceInitialiser, sinkInit server.SinkInitialiser, port int) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return errors.Wrap(err, "failed to listen")
@@ -202,10 +204,10 @@ func listenAndServe(sourceInit SourceInitialiser, sinkInit SinkInitialiser, port
 	defer grpcServer.Stop()
 
 	if sourceInit != nil {
-		proto.RegisterMessageSourceServer(grpcServer, &ConsumeServer{Initialiser: sourceInit})
+		proto.RegisterMessageSourceServer(grpcServer, &server.ConsumeServer{Initialiser: sourceInit})
 	}
 	if sinkInit != nil {
-		proto.RegisterMessageSinkServer(grpcServer, &ProduceServer{Initialiser: sinkInit})
+		proto.RegisterMessageSinkServer(grpcServer, &server.ProduceServer{Initialiser: sinkInit})
 	}
 
 	errCh := make(chan error, 1)
