@@ -108,13 +108,21 @@ func (s *produceServer) receiveFromClient(ctx context.Context, stream receivePro
 			if started {
 				return errStartedTwice
 			}
-			startRequest <- msg.GetStartRequest()
 			started = true
+			select {
+			case <-ctx.Done():
+				return nil
+			case startRequest <- msg.GetStartRequest():
+			}
 		case msg.GetMsg() != nil:
 			if !started {
 				return errNotConnected
 			}
-			toSubstrate <- &substrateMessage{proximoMsg: msg.GetMsg()}
+			select {
+			case <-ctx.Done():
+				return nil
+			case toSubstrate <- &substrateMessage{proximoMsg: msg.GetMsg()}:
+			}
 		default:
 			return errInvalidRequest
 		}
