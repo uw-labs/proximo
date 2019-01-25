@@ -138,7 +138,7 @@ func (s *ProduceServer) sendAcksToClient(ctx context.Context, stream sendProduce
 		case ackMsg := <-fromSubstrate:
 			sMsg, ok := ackMsg.(*substrateMessage)
 			if !ok {
-				return errors.Errorf("wrong message type from substrate - message: %s", sMsg)
+				return errors.Errorf("wrong message type from substrate - message: %v", ackMsg)
 			}
 			if err := stream.Send(&proto.Confirmation{MsgID: sMsg.proximoMsg.Id}); err != nil {
 				return err
