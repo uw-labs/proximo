@@ -54,11 +54,11 @@ func (i SinkInitialiser) NewSink(ctx context.Context, req *proto.StartPublishReq
 
 func toKafkaOffset(offset proto.Offset) int64 {
 	switch offset {
-	case proto.Offset_OFFSET_DEFAULT:
+	case proto.OFFSET_DEFAULT:
 		return kafka.OffsetOldest
-	case proto.Offset_OFFSET_OLDEST:
+	case proto.OFFSET_OLDEST:
 		return kafka.OffsetOldest
-	case proto.Offset_OFFSET_NEWEST:
+	case proto.OFFSET_NEWEST:
 		return kafka.OffsetNewest
 	default:
 		panic(fmt.Sprintf("unknown offset: %s", offset))

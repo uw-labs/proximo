@@ -1,3 +1,3 @@
 #!/bin/sh
-protoc -I../proto --go_out=plugins=grpc,import_path=proto:. *.proto
+protoc -I../proto --gogoslick_out=plugins=grpc,import_path=proto:. *.proto
 
