@@ -38,6 +38,9 @@ func (h *memHandler) HandleConsume(ctx context.Context, conf consumerConfig, for
 }
 
 func (h *memHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
+	idsToConfirm := make(chan string)
+	go h.sendConfirmations(ctx, forClient, idsToConfirm)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -45,16 +48,38 @@ func (h *memHandler) HandleProduce(ctx context.Context, conf producerConfig, for
 		case msg := <-messages:
 			select {
 			case h.incomingMessages <- &produceReq{conf.topic, msg}:
-				select {
-				case forClient <- &Confirmation{MsgID: msg.GetId()}:
-				case <-ctx.Done():
-					return nil
-				}
+			case <-ctx.Done():
+				return nil
+			}
+			select {
+			case idsToConfirm <- msg.GetId():
 			case <-ctx.Done():
 				return nil
 			}
 		}
+	}
+}
 
+func (h *memHandler) sendConfirmations(ctx context.Context, forClient chan<- *Confirmation, idsToConfirm <-chan string) {
+	toConfirm := make([]string, 0)
+	for {
+		if len(toConfirm) == 0 {
+			select {
+			case <-ctx.Done():
+				return
+			case ids := <-idsToConfirm:
+				toConfirm = append(toConfirm, ids)
+			}
+		} else {
+			select {
+			case <-ctx.Done():
+				return
+			case ids := <-idsToConfirm:
+				toConfirm = append(toConfirm, ids)
+			case forClient <- &Confirmation{MsgID: toConfirm[0]}:
+				toConfirm = toConfirm[1:]
+			}
+		}
 	}
 }
 
