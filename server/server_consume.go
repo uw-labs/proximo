@@ -191,13 +191,23 @@ func (s *ConsumeServer) passAcksToSubstrate(ctx context.Context, fromClient <-ch
 			if !ok {
 				return status.Errorf(codes.InvalidArgument, "no message to confirm with id `%s`", ack.MsgID)
 			}
-			delete(ackMap, ack.MsgID)
 
-			select {
-			case <-ctx.Done():
-				return nil
-			case toSubstrate <- sMsg:
+			sent := false
+			for !sent {
+				select {
+				case <-ctx.Done():
+					return nil
+				case toSubstrate <- sMsg:
+					sent = true
+				case ackMsg := <-toAck:
+					if dMsg, ok := ackMsg.substrateMsg.(substrate.DiscardableMessage); ok {
+						dMsg.DiscardPayload() // Discard payload to save space
+					}
+					ackMap[ackMsg.id] = ackMsg.substrateMsg
+				}
 			}
+
+			delete(ackMap, ack.MsgID)
 		}
 	}
 }
