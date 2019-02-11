@@ -2,16 +2,19 @@ package main
 
 import (
 	"context"
-	"errors"
 	"io"
 	"strings"
+
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
-	errStartedTwice   = errors.New("consumption already started")
-	errInvalidConfirm = errors.New("invalid confirmation")
-	errNotConnected   = errors.New("not connected to a topic")
-	errInvalidRequest = errors.New("invalid consumer request - this is possibly a bug in your client library")
+	errStartedTwice   = status.Error(codes.InvalidArgument, "consumption already started")
+	errInvalidConfirm = status.Error(codes.InvalidArgument, "invalid confirmation")
+	errNotConnected   = status.Error(codes.InvalidArgument, "not connected to a topic")
+	errInvalidRequest = status.Error(codes.InvalidArgument, "invalid consumer request - this is possibly a bug in your client library")
 )
 
 type consumerConfig struct {
@@ -28,96 +31,98 @@ type consumeServer struct {
 }
 
 func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
+	sCtx := stream.Context()
 
-	ctx, cancel := context.WithCancel(stream.Context())
-	defer cancel()
+	// This context with cancel is used when a goroutine
+	// terminates cleanly to shut down the other ones as well
+	ctx, cancel := context.WithCancel(sCtx)
+	eg, ctx := errgroup.WithContext(ctx)
 
-	startRequest := make(chan *StartConsumeRequest)
+	forClient := make(chan *Message)
 	confirmRequest := make(chan *Confirmation)
-	errors := make(chan error, 3)
+	startRequest := make(chan *StartConsumeRequest)
 
-	go func() {
+	eg.Go(func() error {
+		defer cancel()
+
 		started := false
 		for {
 			msg, err := stream.Recv()
 			if err != nil {
 				if err == io.EOF {
-					return
+					return nil
 				}
 				if strings.HasSuffix(err.Error(), "context canceled") {
-					return
+					return nil
 				}
-				errors <- err
-				return
+				return err
 			}
 			switch {
 			case msg.GetStartRequest() != nil:
 				if started {
-					errors <- errStartedTwice
-					return
+					return errStartedTwice
 				}
-				startRequest <- msg.GetStartRequest()
 				started = true
+				select {
+				case startRequest <- msg.GetStartRequest():
+				case <-ctx.Done():
+					return nil
+				}
 			case msg.GetConfirmation() != nil:
 				if !started {
-					errors <- errInvalidConfirm
-					return
+					return errInvalidConfirm
 				}
-				confirmRequest <- msg.GetConfirmation()
+				select {
+				case confirmRequest <- msg.GetConfirmation():
+				case <-ctx.Done():
+					return nil
+				}
 			default:
-				errors <- errInvalidRequest
-				return
+				return errInvalidRequest
 			}
 		}
-	}()
+	})
 
-	var topic string
-	var consumer string
+	eg.Go(func() error {
+		defer cancel()
 
-	select {
-	case sr := <-startRequest:
-		topic = sr.GetTopic()
-		consumer = sr.GetConsumer()
-	case <-ctx.Done():
-		return nil //ctx.Err()
-	}
-
-	forClient := make(chan *Message)
-
-	go func() {
 		for {
 			select {
 			case m := <-forClient:
 				err := stream.Send(m)
 				if err != nil {
 					if strings.HasSuffix(err.Error(), "context canceled") {
-						return
+						return nil
 					}
-					errors <- err
-					return
+					return err
 				}
 			case <-ctx.Done():
-				return
+				return nil
 			}
 		}
-	}()
+	})
 
-	go func() {
-		conf := consumerConfig{
-			consumer: consumer,
-			topic:    topic,
-		}
-		err := s.handler.HandleConsume(ctx, conf, forClient, confirmRequest)
-		if err != nil {
-			errors <- err
-		}
-	}()
+	eg.Go(func() error {
+		defer cancel()
 
-	select {
-	case err := <-errors:
+		var conf consumerConfig
+		select {
+		case sr := <-startRequest:
+			conf.topic = sr.GetTopic()
+			conf.consumer = sr.GetConsumer()
+		case <-ctx.Done():
+			return nil
+		}
+
+		return s.handler.HandleConsume(ctx, conf, forClient, confirmRequest)
+	})
+
+	if err := eg.Wait(); err != nil {
 		return err
-	case <-ctx.Done():
-		return nil
 	}
 
+	if err := sCtx.Err(); err == context.Canceled {
+		return status.Error(codes.Canceled, err.Error())
+	}
+	return sCtx.Err()
 }
