@@ -92,27 +92,6 @@ func main() {
 		}
 	})
 
-	app.Command("amqp", "Use AMQP backend", func(cmd *cli.Cmd) {
-		address := cmd.String(cli.StringOpt{
-			Name:   "address",
-			Value:  "amqp://localhost:5672",
-			Desc:   "Broker address",
-			EnvVar: "PROXIMO_AMQP_ADDRESS",
-		})
-		cmd.Action = func() {
-			kh := &amqpHandler{
-				address: *address,
-			}
-			if enabled[consumeEndpoint] {
-				cHandler = kh
-			}
-			if enabled[publishEndpoint] {
-				log.Fatal("publish endpoint not impelented by amqp backend")
-			}
-			log.Printf("Using AMQP at %s\n", *address)
-		}
-	})
-
 	app.Command("nats-streaming", "Use NATS streaming backend", func(cmd *cli.Cmd) {
 		url := cmd.String(cli.StringOpt{
 			Name:   "url",
