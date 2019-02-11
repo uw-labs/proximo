@@ -130,23 +130,11 @@ func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
 
 }
 
-// messageSink_PublishServer is a subset of the auto-generated
-// MessageSink_PublishServer interface and makes things easier in tests.
-type messageSink_PublishServer interface {
-	Send(*Confirmation) error
-	Recv() (*PublisherRequest, error)
-	Context() context.Context
-}
-
 type produceServer struct {
 	handler produceHandler
 }
 
 func (s *produceServer) Publish(stream MessageSink_PublishServer) error {
-	return s.publish(stream)
-}
-
-func (s *produceServer) publish(stream messageSink_PublishServer) error {
 
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
