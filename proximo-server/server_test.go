@@ -2,112 +2,125 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net"
+	"os"
 	"testing"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
+
+	"github.com/gofrs/uuid"
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
+	"github.com/uw-labs/proximo/proximoc-go"
 )
 
-// TestProduceCloseWithAckPending tried to recreate a scenario where a backend
-// is trying to send an ack while we are shutting down.  This resulted in a
-// panic due to a write to a closed channel.  This test is to ensure the bug
-// cannot be re-introduced later.
-func TestProduceCloseWithAckPending(t *testing.T) {
-	handler := newMockProduceHandler()
+var (
+	backend    *MockBackend
+	grpcServer *grpc.Server
+)
 
-	svr := &produceServer{handler}
-
-	tscs := newTestMessageSourceProduceServer()
-
-	// start publish server
-	pubErr := make(chan error, 1)
-	go func() {
-		pubErr <- svr.publish(tscs)
-	}()
-
-	// start request, then send message.
-	tscs.toSend <- &PublisherRequest{StartRequest: &StartPublishRequest{Topic: "topic"}}
-	tscs.toSend <- &PublisherRequest{Msg: &Message{Id: "message1", Data: []byte("message payload")}}
-
-	// without acking message, exit
-	tscs.cancel()
-	err := <-pubErr
+func Setup() error {
+	lis, err := net.Listen("tcp", ":6868")
 	if err != nil {
-		t.Error(err)
+		return errors.Wrap(err, "failed to listen")
 	}
 
-	// now ack message
-	handler.releaseOne <- struct{}{}
+	opts := []grpc.ServerOption{
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			Time: 5 * time.Minute,
+		}),
+	}
+	grpcServer = grpc.NewServer(opts...)
 
-	// ugly, but due to the nature of this bug, we don't have anything to
-	// sync on properly.
-	time.Sleep(10 * time.Millisecond)
+	backend = NewMockBackend()
+
+	RegisterMessageSourceServer(grpcServer, &consumeServer{handler: backend})
+	RegisterMessageSinkServer(grpcServer, &produceServer{handler: backend})
+	go func() { grpcServer.Serve(lis) }()
+
+	// Wait for server to start
+	cc, err := grpc.Dial("localhost:6868", grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return errors.Wrap(err, "failed to open client connection")
+	}
+
+	return cc.Close()
 }
 
-func newTestMessageSourceProduceServer() *testMessageSourceProduceServer {
-	ctx, cancel := context.WithCancel(context.Background())
-	return &testMessageSourceProduceServer{
-		ctx:       ctx,
-		cancel:    cancel,
-		toSend:    make(chan *PublisherRequest),
-		toSendErr: make(chan error, 1),
+func TestMain(m *testing.M) {
+	if err := Setup(); err != nil {
+		fmt.Fprintf(os.Stderr, "testing: failed to setup tests: %v", err)
+		os.Exit(1)
+	}
+
+	exitCode := m.Run()
+
+	grpcServer.Stop() // This will also close the listener
+	os.Exit(exitCode)
+}
+
+func TestProduceServer_Publish(t *testing.T) {
+	assert := require.New(t)
+	toPublish := [][]byte{
+		[]byte("publish-message-1"),
+		[]byte("publish-message-2"),
+		[]byte("publish-message-3"),
+		[]byte("publish-message-4"),
+		[]byte("publish-message-5"),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	client, err := proximoc.DialProducer(ctx, "localhost:6868", "publish-test")
+	assert.NoError(err)
+	defer func() { assert.NoError(client.Close()) }()
+
+	for _, msg := range toPublish {
+		assert.NoError(client.Produce(msg))
+	}
+
+	published := backend.GetTopic("publish-test")
+	assert.Equal(len(toPublish), len(published))
+	for i, msg := range toPublish {
+		assert.Equal(msg, published[i].Data)
 	}
 }
 
-type testMessageSourceProduceServer struct {
-	ctx       context.Context
-	cancel    func()
-	toSend    chan *PublisherRequest
-	toSendErr chan error
-}
-
-func (ms *testMessageSourceProduceServer) Send(*Confirmation) error {
-	return nil
-}
-
-func (ms *testMessageSourceProduceServer) Recv() (*PublisherRequest, error) {
-	select {
-	case tr := <-ms.toSend:
-		return tr, nil
-	case err := <-ms.toSendErr:
-		return nil, err
+func TestConsumeServer_Consume(t *testing.T) {
+	assert := require.New(t)
+	expected := []*Message{
+		{
+			Id:   uuid.Must(uuid.NewV4()).String(),
+			Data: []byte("consume-message-1"),
+		},
+		{
+			Id:   uuid.Must(uuid.NewV4()).String(),
+			Data: []byte("consume-message-2"),
+		},
+		{
+			Id:   uuid.Must(uuid.NewV4()).String(),
+			Data: []byte("consume-message-3"),
+		},
 	}
-}
+	backend.SetTopic("consume-test", expected)
 
-func (ms *testMessageSourceProduceServer) Context() context.Context {
-	return ms.ctx
-}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 
-func newMockProduceHandler() *mockProduceHandler {
-	return &mockProduceHandler{
-		make(chan struct{}),
-	}
-}
+	consumed := make([]*proximoc.Message, 0, 3)
+	err := proximoc.ConsumeContext(ctx, "localhost:6868", "test-consumer", "consume-test", func(msg *proximoc.Message) error {
+		consumed = append(consumed, msg)
+		return nil
+	})
+	assert.NoError(err)
+	assert.Equal(len(expected), len(consumed))
 
-type mockProduceHandler struct {
-	// write to this chan to release a confirmation for a message that's been sent.
-	releaseOne chan struct{}
-}
-
-func (mh *mockProduceHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
-
-	go mh.loop(forClient, messages)
-
-	<-ctx.Done()
-	return nil
-}
-
-func (mh *mockProduceHandler) loop(forClient chan<- *Confirmation, messages <-chan *Message) {
-	var toConfirm []*Message
-	for {
-		var rel chan struct{}
-		if len(toConfirm) > 0 {
-			rel = mh.releaseOne
-		}
-		select {
-		case m := <-messages:
-			toConfirm = append(toConfirm, m)
-		case <-rel:
-			forClient <- &Confirmation{toConfirm[0].Id}
-			toConfirm = toConfirm[1:]
-		}
+	for i, msg := range expected {
+		assert.Equal(msg.Id, consumed[i].Id)
+		assert.Equal(msg.Data, consumed[i].Data)
 	}
 }
