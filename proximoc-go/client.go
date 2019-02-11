@@ -14,10 +14,12 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
+// Deprecated: Use https://github.com/uw-labs/substrate/tree/master/proximo instead
 func ConsumeContext(ctx context.Context, proximoAddress string, consumer string, topic string, f func(*Message) error) error {
 	return consumeContext(ctx, proximoAddress, consumer, topic, f, grpc.WithInsecure())
 }
 
+// Deprecated: Use https://github.com/uw-labs/substrate/tree/master/proximo instead
 func ConsumeContextTLS(ctx context.Context, proximoAddress string, consumer string, topic string, f func(*Message) error, conf *tls.Config) error {
 	return consumeContext(ctx, proximoAddress, consumer, topic, f, grpc.WithTransportCredentials(credentials.NewTLS(conf)))
 }
@@ -114,10 +116,12 @@ func consumeContext(ctx context.Context, proximoAddress string, consumer string,
 
 }
 
+// Deprecated: Use https://github.com/uw-labs/substrate/tree/master/proximo instead
 func DialProducer(ctx context.Context, proximoAddress string, topic string) (*ProducerConn, error) {
 	return dialProducer(ctx, proximoAddress, topic, grpc.WithInsecure())
 }
 
+// Deprecated: Use https://github.com/uw-labs/substrate/tree/master/proximo instead
 func DialProducerTLS(ctx context.Context, proximoAddress string, topic string, conf *tls.Config) (*ProducerConn, error) {
 	return dialProducer(ctx, proximoAddress, topic, grpc.WithTransportCredentials(credentials.NewTLS(conf)))
 }
@@ -157,6 +161,7 @@ type req struct {
 	resp chan error
 }
 
+// Deprecated: Use https://github.com/uw-labs/substrate/tree/master/proximo instead
 type ProducerConn struct {
 	cc *grpc.ClientConn
 
