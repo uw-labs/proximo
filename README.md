@@ -26,9 +26,8 @@ This is the Proximo server implementation, written in Go
 
 ## Proximo client libraries
 
-[Go client library](proximoc-go)
-
-[Java client library](proximoc-java)
+* **go** - [substrate](https://github.com/uw-labs/substrate) - we recommend to use substrate to access
+proximo from go
 
 ## API definition (protobuf)
 
