@@ -8,6 +8,8 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/uw-labs/proximo/proto"
 )
 
 var (
@@ -23,14 +25,14 @@ type consumerConfig struct {
 }
 
 type consumeHandler interface {
-	HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error
+	HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error
 }
 
 type consumeServer struct {
 	handler consumeHandler
 }
 
-func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
+func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error {
 	sCtx := stream.Context()
 
 	// This context with cancel is used when a goroutine
@@ -38,9 +40,9 @@ func (s *consumeServer) Consume(stream MessageSource_ConsumeServer) error {
 	ctx, cancel := context.WithCancel(sCtx)
 	eg, ctx := errgroup.WithContext(ctx)
 
-	forClient := make(chan *Message)
-	confirmRequest := make(chan *Confirmation)
-	startRequest := make(chan *StartConsumeRequest)
+	forClient := make(chan *proto.Message)
+	confirmRequest := make(chan *proto.Confirmation)
+	startRequest := make(chan *proto.StartConsumeRequest)
 
 	eg.Go(func() error {
 		defer cancel()

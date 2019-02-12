@@ -11,6 +11,8 @@ import (
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
 	"google.golang.org/grpc/grpclog"
+
+	"github.com/uw-labs/proximo/proto"
 )
 
 type kafkaConsumeHandler struct {
@@ -18,7 +20,7 @@ type kafkaConsumeHandler struct {
 	version *sarama.KafkaVersion
 }
 
-func (h *kafkaConsumeHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (h *kafkaConsumeHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
 	toConfirmIds := make(chan string)
 
 	errors := make(chan error)
@@ -73,7 +75,7 @@ func (h *kafkaConsumeHandler) HandleConsume(ctx context.Context, conf consumerCo
 	}
 }
 
-func (h *kafkaConsumeHandler) consume(ctx context.Context, c *cluster.Consumer, forClient chan<- *Message, toConfirmID chan string, topic, consumer string) error {
+func (h *kafkaConsumeHandler) consume(ctx context.Context, c *cluster.Consumer, forClient chan<- *proto.Message, toConfirmID chan string, topic, consumer string) error {
 
 	grpclog.Println("started consume loop")
 	defer grpclog.Println("exited consume loop")
@@ -92,7 +94,7 @@ func (h *kafkaConsumeHandler) consume(ctx context.Context, c *cluster.Consumer, 
 				return c.Close()
 			}
 			select {
-			case forClient <- &Message{Data: msg.Value, Id: confirmID}:
+			case forClient <- &proto.Message{Data: msg.Value, Id: confirmID}:
 			case <-ctx.Done():
 				grpclog.Println("context is done")
 				return c.Close()
@@ -126,7 +128,7 @@ type kafkaProduceHandler struct {
 	version *sarama.KafkaVersion
 }
 
-func (h *kafkaProduceHandler) HandleProduce(ctx context.Context, cfg producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (h *kafkaProduceHandler) HandleProduce(ctx context.Context, cfg producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
 	conf := sarama.NewConfig()
 	conf.Producer.Return.Successes = true
 	conf.Producer.RequiredAcks = sarama.WaitForAll
@@ -153,7 +155,7 @@ func (h *kafkaProduceHandler) HandleProduce(ctx context.Context, cfg producerCon
 			if err != nil {
 				return err
 			}
-			forClient <- &Confirmation{MsgID: m.GetId()}
+			forClient <- &proto.Confirmation{MsgID: m.GetId()}
 		case <-ctx.Done():
 			return nil
 		}

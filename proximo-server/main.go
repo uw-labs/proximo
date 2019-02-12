@@ -16,6 +16,8 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+
+	"github.com/uw-labs/proximo/proto"
 )
 
 const (
@@ -185,10 +187,10 @@ func listenAndServe(cHandler consumeHandler, pHandler produceHandler, port int) 
 	defer grpcServer.Stop()
 
 	if cHandler != nil {
-		RegisterMessageSourceServer(grpcServer, &consumeServer{handler: cHandler})
+		proto.RegisterMessageSourceServer(grpcServer, &consumeServer{handler: cHandler})
 	}
 	if pHandler != nil {
-		RegisterMessageSinkServer(grpcServer, &produceServer{handler: pHandler})
+		proto.RegisterMessageSinkServer(grpcServer, &produceServer{handler: pHandler})
 	}
 
 	errCh := make(chan error, 1)

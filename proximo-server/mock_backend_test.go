@@ -6,24 +6,26 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/uw-labs/proximo/proto"
 )
 
 // MockBackend is a simple backend implementation that allows one consumer or publisher at a time and
 // allows user to set the messages to be consumed or check the messages that were produced.
 type MockBackend struct {
 	mutex    sync.Mutex
-	messages map[string][]*Message
+	messages map[string][]*proto.Message
 }
 
 // NewMockBackend returns a new instance of the mock backend.
 func NewMockBackend() *MockBackend {
 	return &MockBackend{
-		messages: make(map[string][]*Message),
+		messages: make(map[string][]*proto.Message),
 	}
 }
 
 // GetTopic returns all messages published to a given topic.
-func (b *MockBackend) GetTopic(topic string) []*Message {
+func (b *MockBackend) GetTopic(topic string) []*proto.Message {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -31,14 +33,14 @@ func (b *MockBackend) GetTopic(topic string) []*Message {
 }
 
 // SetTopic sets messages to be consumed for a given topic.
-func (b *MockBackend) SetTopic(topic string, messages []*Message) {
+func (b *MockBackend) SetTopic(topic string, messages []*proto.Message) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
 	b.messages[topic] = messages
 }
 
-func (b *MockBackend) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (b *MockBackend) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -50,7 +52,7 @@ func (b *MockBackend) HandleConsume(ctx context.Context, conf consumerConfig, fo
 	msgIndex := 0
 	toAckIdx := 0
 
-	processConfirm := func(confirm *Confirmation) error {
+	processConfirm := func(confirm *proto.Confirmation) error {
 		if toAckIdx == msgIndex {
 			return status.Error(codes.InvalidArgument, "no acknowledgement expected")
 		}
@@ -92,19 +94,19 @@ func (b *MockBackend) HandleConsume(ctx context.Context, conf consumerConfig, fo
 	}
 }
 
-func (b *MockBackend) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (b *MockBackend) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
 	msgs, ok := b.messages[conf.topic]
 	if !ok {
-		msgs = make([]*Message, 0)
+		msgs = make([]*proto.Message, 0)
 	}
 	defer func() {
 		b.messages[conf.topic] = msgs
 	}()
 
-	toConfirm := make([]*Confirmation, 0)
+	toConfirm := make([]*proto.Confirmation, 0)
 	for {
 		if len(toConfirm) == 0 {
 			select {
@@ -112,7 +114,7 @@ func (b *MockBackend) HandleProduce(ctx context.Context, conf producerConfig, fo
 				return nil
 			case msg := <-messages:
 				msgs = append(msgs, msg)
-				toConfirm = append(toConfirm, &Confirmation{MsgID: msg.Id})
+				toConfirm = append(toConfirm, &proto.Confirmation{MsgID: msg.Id})
 			}
 		} else {
 			select {
@@ -120,7 +122,7 @@ func (b *MockBackend) HandleProduce(ctx context.Context, conf producerConfig, fo
 				return nil
 			case msg := <-messages:
 				msgs = append(msgs, msg)
-				toConfirm = append(toConfirm, &Confirmation{MsgID: msg.Id})
+				toConfirm = append(toConfirm, &proto.Confirmation{MsgID: msg.Id})
 			case forClient <- toConfirm[0]:
 				toConfirm = toConfirm[1:]
 			}
