@@ -1,6 +1,6 @@
 # Proximo server
 
-This is a proximo server implementation that can target Apache Kafka or AMQP servers.
+This is a proximo server implementation that can target Apache Kafka or NATS Streaming servers.
 
 ## Installation
 ```
