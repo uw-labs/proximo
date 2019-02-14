@@ -23,11 +23,11 @@ type memHandler struct {
 	last100 map[string][]*proto.Message
 }
 
-func (h *memHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
+func (h *memHandler) HandleConsume(ctx context.Context, req *proto.StartConsumeRequest, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	h.subs <- &sub{conf.topic, conf.consumer, forClient, ctx}
+	h.subs <- &sub{req.GetTopic(), req.GetConsumer(), forClient, ctx}
 
 	for {
 		select {

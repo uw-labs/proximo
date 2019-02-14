@@ -19,13 +19,8 @@ var (
 	errInvalidRequest = status.Error(codes.InvalidArgument, "invalid consumer request - this is possibly a bug in your client library")
 )
 
-type consumerConfig struct {
-	consumer string
-	topic    string
-}
-
 type consumeHandler interface {
-	HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error
+	HandleConsume(ctx context.Context, req *proto.StartConsumeRequest, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error
 }
 
 type consumeServer struct {
@@ -107,16 +102,14 @@ func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error 
 	eg.Go(func() error {
 		defer cancel()
 
-		var conf consumerConfig
+		var req *proto.StartConsumeRequest
 		select {
-		case sr := <-startRequest:
-			conf.topic = sr.GetTopic()
-			conf.consumer = sr.GetConsumer()
+		case req = <-startRequest:
 		case <-ctx.Done():
 			return nil
 		}
 
-		return s.handler.HandleConsume(ctx, conf, forClient, confirmRequest)
+		return s.handler.HandleConsume(ctx, req, forClient, confirmRequest)
 	})
 
 	if err := eg.Wait(); err != nil {

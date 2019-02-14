@@ -40,11 +40,11 @@ func (b *MockBackend) SetTopic(topic string, messages []*proto.Message) {
 	b.messages[topic] = messages
 }
 
-func (b *MockBackend) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
+func (b *MockBackend) HandleConsume(ctx context.Context, req *proto.StartConsumeRequest, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	messages, ok := b.messages[conf.topic]
+	messages, ok := b.messages[req.GetTopic()]
 	if !ok || len(messages) == 0 {
 		return nil
 	}

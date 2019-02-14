@@ -35,9 +35,9 @@ func (h *natsStreamingConsumeHandler) Close() error {
 	return nil
 }
 
-func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
+func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, req *proto.StartConsumeRequest, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
 
-	conn, err := stan.Connect(h.clusterID, conf.consumer+generateID(), stan.NatsConn(h.nc))
+	conn, err := stan.Connect(h.clusterID, req.GetConsumer()+generateID(), stan.NatsConn(h.nc))
 	if err != nil {
 		return err
 	}
@@ -89,11 +89,11 @@ func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, conf co
 	}
 
 	subscription, err := conn.QueueSubscribe(
-		conf.topic,
-		conf.consumer,
+		req.GetTopic(),
+		req.GetConsumer(),
 		f,
 		stan.StartAt(pb.StartPosition_First),
-		stan.DurableName(conf.consumer),
+		stan.DurableName(req.GetConsumer()),
 		stan.SetManualAckMode(),
 		stan.AckWait(60*time.Second),
 		stan.MaxInflight(h.maxInflight),

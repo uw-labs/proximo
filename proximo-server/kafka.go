@@ -20,7 +20,7 @@ type kafkaConsumeHandler struct {
 	version *sarama.KafkaVersion
 }
 
-func (h *kafkaConsumeHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
+func (h *kafkaConsumeHandler) HandleConsume(ctx context.Context, req *proto.StartConsumeRequest, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
 	toConfirmIds := make(chan string)
 
 	errors := make(chan error)
@@ -34,7 +34,7 @@ func (h *kafkaConsumeHandler) HandleConsume(ctx context.Context, conf consumerCo
 		config.Version = *h.version
 	}
 
-	c, err := cluster.NewConsumer(h.brokers, conf.consumer, []string{conf.topic}, config)
+	c, err := cluster.NewConsumer(h.brokers, req.GetConsumer(), []string{req.GetTopic()}, config)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func (h *kafkaConsumeHandler) HandleConsume(ctx context.Context, conf consumerCo
 	}()
 
 	go func() {
-		err := h.consume(ctx, c, forClient, toConfirmIds, conf.topic, conf.consumer)
+		err := h.consume(ctx, c, forClient, toConfirmIds, req.GetTopic(), req.GetConsumer())
 		if err != nil {
 			errors <- err
 		}
@@ -62,7 +62,7 @@ func (h *kafkaConsumeHandler) HandleConsume(ctx context.Context, conf consumerCo
 			if toConfirm[0] != cr.GetMsgID() {
 				return errInvalidConfirm
 			}
-			err := h.confirm(ctx, c, cr.GetMsgID(), conf.topic)
+			err := h.confirm(ctx, c, cr.GetMsgID(), req.GetTopic())
 			if err != nil {
 				return err
 			}
