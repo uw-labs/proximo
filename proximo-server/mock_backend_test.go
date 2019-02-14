@@ -94,16 +94,16 @@ func (b *MockBackend) HandleConsume(ctx context.Context, conf consumerConfig, fo
 	}
 }
 
-func (b *MockBackend) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
+func (b *MockBackend) HandleProduce(ctx context.Context, req *proto.StartPublishRequest, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	msgs, ok := b.messages[conf.topic]
+	msgs, ok := b.messages[req.GetTopic()]
 	if !ok {
 		msgs = make([]*proto.Message, 0)
 	}
 	defer func() {
-		b.messages[conf.topic] = msgs
+		b.messages[req.GetTopic()] = msgs
 	}()
 
 	toConfirm := make([]*proto.Confirmation, 0)

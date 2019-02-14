@@ -142,7 +142,7 @@ func (h *natsStreamingProduceHandler) Close() error {
 	return nil
 }
 
-func (h *natsStreamingProduceHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
+func (h *natsStreamingProduceHandler) HandleProduce(ctx context.Context, req *proto.StartPublishRequest, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
 
 	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsConn(h.nc))
 	if err != nil {
@@ -154,7 +154,7 @@ func (h *natsStreamingProduceHandler) HandleProduce(ctx context.Context, conf pr
 		case <-ctx.Done():
 			return conn.Close()
 		case msg := <-messages:
-			err := conn.Publish(conf.topic, msg.GetData())
+			err := conn.Publish(req.GetTopic(), msg.GetData())
 			if err != nil {
 				conn.Close()
 				return err

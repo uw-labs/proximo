@@ -128,7 +128,7 @@ type kafkaProduceHandler struct {
 	version *sarama.KafkaVersion
 }
 
-func (h *kafkaProduceHandler) HandleProduce(ctx context.Context, cfg producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
+func (h *kafkaProduceHandler) HandleProduce(ctx context.Context, req *proto.StartPublishRequest, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
 	conf := sarama.NewConfig()
 	conf.Producer.Return.Successes = true
 	conf.Producer.RequiredAcks = sarama.WaitForAll
@@ -146,7 +146,7 @@ func (h *kafkaProduceHandler) HandleProduce(ctx context.Context, cfg producerCon
 		select {
 		case m := <-messages:
 			pm := &sarama.ProducerMessage{
-				Topic: cfg.topic,
+				Topic: req.GetTopic(),
 				Value: sarama.ByteEncoder(m.GetData()),
 				// Key = TODO:
 			}

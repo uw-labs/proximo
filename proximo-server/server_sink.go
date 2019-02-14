@@ -12,12 +12,8 @@ import (
 	"github.com/uw-labs/proximo/proto"
 )
 
-type producerConfig struct {
-	topic string
-}
-
 type produceHandler interface {
-	HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error
+	HandleProduce(ctx context.Context, req *proto.StartPublishRequest, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error
 }
 
 type produceServer struct {
@@ -95,15 +91,14 @@ func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 	eg.Go(func() error {
 		defer cancel()
 
-		var conf producerConfig
+		var req *proto.StartPublishRequest
 		select {
-		case sr := <-startRequest:
-			conf.topic = sr.GetTopic()
+		case req = <-startRequest:
 		case <-ctx.Done():
 			return nil
 		}
 
-		return s.handler.HandleProduce(ctx, conf, forClient, messages)
+		return s.handler.HandleProduce(ctx, req, forClient, messages)
 	})
 
 	if err := eg.Wait(); err != nil {

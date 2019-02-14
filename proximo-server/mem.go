@@ -39,7 +39,7 @@ func (h *memHandler) HandleConsume(ctx context.Context, conf consumerConfig, for
 	}
 }
 
-func (h *memHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
+func (h *memHandler) HandleProduce(ctx context.Context, req *proto.StartPublishRequest, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
 	idsToConfirm := make(chan string)
 	go h.sendConfirmations(ctx, forClient, idsToConfirm)
 
@@ -49,7 +49,7 @@ func (h *memHandler) HandleProduce(ctx context.Context, conf producerConfig, for
 			return nil
 		case msg := <-messages:
 			select {
-			case h.incomingMessages <- &produceReq{conf.topic, msg}:
+			case h.incomingMessages <- &produceReq{req.GetTopic(), msg}:
 			case <-ctx.Done():
 				return nil
 			}
