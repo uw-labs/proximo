@@ -5,11 +5,11 @@ import (
 	"io"
 	"strings"
 
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/uw-labs/proximo/internal/proto"
+	"github.com/uw-labs/proximo/pkg/rungroup"
 )
 
 var (
@@ -35,18 +35,13 @@ type consumeServer struct {
 func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error {
 	sCtx := stream.Context()
 
-	// This context with cancel is used when a goroutine
-	// terminates cleanly to shut down the other ones as well
-	ctx, cancel := context.WithCancel(sCtx)
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := rungroup.New(sCtx)
 
 	forClient := make(chan *proto.Message)
 	confirmRequest := make(chan *proto.Confirmation)
 	startRequest := make(chan *proto.StartConsumeRequest)
 
-	eg.Go(func() error {
-		defer cancel()
-
+	eg.GoAsync(func() error {
 		started := false
 		for {
 			msg, err := stream.Recv()
@@ -85,9 +80,7 @@ func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error 
 		}
 	})
 
-	eg.Go(func() error {
-		defer cancel()
-
+	eg.GoAsync(func() error {
 		for {
 			select {
 			case m := <-forClient:
@@ -105,8 +98,6 @@ func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error 
 	})
 
 	eg.Go(func() error {
-		defer cancel()
-
 		var conf consumerConfig
 		select {
 		case sr := <-startRequest:

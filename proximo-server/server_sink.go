@@ -5,11 +5,11 @@ import (
 	"io"
 	"strings"
 
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/uw-labs/proximo/internal/proto"
+	"github.com/uw-labs/proximo/pkg/rungroup"
 )
 
 type producerConfig struct {
@@ -27,18 +27,13 @@ type produceServer struct {
 func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 	sCtx := stream.Context()
 
-	// This context with cancel is used when a goroutine
-	// terminates cleanly to shut down the other ones as well
-	ctx, cancel := context.WithCancel(sCtx)
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := rungroup.New(sCtx)
 
 	messages := make(chan *proto.Message)
 	forClient := make(chan *proto.Confirmation)
 	startRequest := make(chan *proto.StartPublishRequest)
 
-	eg.Go(func() error {
-		defer cancel()
-
+	eg.GoAsync(func() error {
 		started := false
 		for {
 			msg, err := stream.Recv()
@@ -77,9 +72,7 @@ func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 		}
 	})
 
-	eg.Go(func() error {
-		defer cancel()
-
+	eg.GoAsync(func() error {
 		for {
 			select {
 			case msg := <-forClient:
@@ -93,8 +86,6 @@ func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 	})
 
 	eg.Go(func() error {
-		defer cancel()
-
 		var conf producerConfig
 		select {
 		case sr := <-startRequest:
