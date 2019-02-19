@@ -12,7 +12,7 @@ import (
 	cluster "github.com/bsm/sarama-cluster"
 	"google.golang.org/grpc/grpclog"
 
-	"github.com/uw-labs/proximo/proto"
+	"github.com/uw-labs/proximo/internal/proto"
 )
 
 type kafkaConsumeHandler struct {
