@@ -12,7 +12,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	cli "github.com/jawher/mow.cli"
-	"github.com/nats-io/go-nats-streaming"
+	stan "github.com/nats-io/go-nats-streaming"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
@@ -111,9 +111,21 @@ func main() {
 			Desc:   "maximum number of unacknowledged messages",
 			EnvVar: "PROXIMO_NATS_MAX_INFLIGHT",
 		})
+		pingIntervalSeconds := cmd.Int(cli.IntOpt{
+			Name:   "ping-interval",
+			Value:  3,
+			Desc:   "interval in seconds for connection pings",
+			EnvVar: "PROXIMO_PING_INTERVAL_SECONDS",
+		})
+		pingNumTimeouts := cmd.Int(cli.IntOpt{
+			Name:   "num-ping-timeouts",
+			Value:  5,
+			Desc:   "number of pings to time out before connection considered broken",
+			EnvVar: "PROXIMO_NUM_PING_TIMEOUTS",
+		})
 		cmd.Action = func() {
 			if enabled[consumeEndpoint] {
-				h, err := newNatsStreamingConsumeHandler(*url, *cid, *maxInflight)
+				h, err := newNatsStreamingConsumeHandler(*url, *cid, *maxInflight, *pingIntervalSeconds, *pingNumTimeouts)
 				if err != nil {
 					log.Fatalf("failed to connect to nats streaming for consumption: %v", err)
 				}

@@ -10,22 +10,29 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/nats-io/go-nats"
-	"github.com/nats-io/go-nats-streaming"
+	stan "github.com/nats-io/go-nats-streaming"
 	"github.com/nats-io/go-nats-streaming/pb"
 )
 
 type natsStreamingConsumeHandler struct {
-	clusterID   string
-	maxInflight int
-	nc          *nats.Conn
+	clusterID           string
+	maxInflight         int
+	nc                  *nats.Conn
+	pingIntervalSeconds int
+	numPingTimeouts     int
 }
 
-func newNatsStreamingConsumeHandler(url, clusterID string, maxInflight int) (*natsStreamingConsumeHandler, error) {
+func newNatsStreamingConsumeHandler(url, clusterID string, maxInflight, pingIntervalSeconds, numPingTimeouts int) (*natsStreamingConsumeHandler, error) {
 	nc, err := nats.Connect(url, nats.Name("proximo-nats-streaming-"+generateID()))
 	if err != nil {
 		return nil, err
 	}
-	return &natsStreamingConsumeHandler{nc: nc, clusterID: clusterID, maxInflight: maxInflight}, nil
+	return &natsStreamingConsumeHandler{
+		nc:                  nc,
+		clusterID:           clusterID,
+		maxInflight:         maxInflight,
+		pingIntervalSeconds: pingIntervalSeconds,
+		numPingTimeouts:     numPingTimeouts}, nil
 }
 
 func (h *natsStreamingConsumeHandler) Close() error {
@@ -35,7 +42,16 @@ func (h *natsStreamingConsumeHandler) Close() error {
 
 func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
 
-	conn, err := stan.Connect(h.clusterID, conf.consumer+generateID(), stan.NatsConn(h.nc))
+	var disconnectErr error
+	disconnected := make(chan struct{})
+	conn, err := stan.Connect(
+		h.clusterID, conf.consumer+generateID(), stan.NatsConn(h.nc),
+		stan.Pings(h.pingIntervalSeconds, h.numPingTimeouts),
+		stan.SetConnectionLostHandler(func(_ stan.Conn, e error) {
+			fmt.Printf("connection to nats streaming lost: %v\n", e)
+			disconnectErr = e
+			close(disconnected)
+		}))
 	if err != nil {
 		return err
 	}
@@ -73,6 +89,8 @@ func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, conf co
 				}
 			case <-ctx.Done():
 				return
+			case <-disconnected:
+				return
 			}
 		}
 	}()
@@ -83,6 +101,8 @@ func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, conf co
 			return
 		case forClient <- &Message{Data: msg.Data, Id: strconv.FormatUint(msg.Sequence, 10)}:
 			ackQueue <- msg
+		case <-disconnected:
+			return
 		}
 	}
 
@@ -117,6 +137,9 @@ func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, conf co
 		wg.Wait()
 		closeAll()
 		return err
+	case <-disconnected:
+		wg.Wait()
+		return disconnectErr
 	}
 
 }
