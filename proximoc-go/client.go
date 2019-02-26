@@ -48,6 +48,9 @@ func consumeContext(ctx context.Context, proximoAddress string, consumer string,
 
 	ins := make(chan *Message, 16) // TODO: make buffer size configurable?
 
+	localCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -60,7 +63,11 @@ func consumeContext(ctx context.Context, proximoAddress string, consumer string,
 				}
 				return
 			}
-			ins <- in
+			select {
+			case ins <- in:
+			case <-localCtx.Done():
+				return
+			}
 		}
 	}()
 
@@ -79,10 +86,10 @@ func consumeContext(ctx context.Context, proximoAddress string, consumer string,
 				}
 				select {
 				case handled <- in.GetId():
-				case <-ctx.Done():
+				case <-localCtx.Done():
 					return
 				}
-			case <-ctx.Done():
+			case <-localCtx.Done():
 				return
 			}
 		}
@@ -108,7 +115,7 @@ func consumeContext(ctx context.Context, proximoAddress string, consumer string,
 			}
 		case err := <-errs:
 			return err
-		case <-ctx.Done():
+		case <-localCtx.Done():
 			return nil //ctx.Err()
 		}
 
