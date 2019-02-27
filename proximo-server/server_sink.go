@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/uw-labs/proximo/internal/proto"
-	"github.com/uw-labs/proximo/pkg/rungroup"
+	"github.com/uw-labs/rungroup"
 )
 
 type producerConfig struct {
