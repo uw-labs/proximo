@@ -1,0 +1,19 @@
+version: 2
+
+jobs:
+  test:
+    working_directory: /go/src/github.com/uw-labs/proximo
+    docker:
+    - image: circleci/golang:1.11
+    steps:
+    - checkout
+    - run: go get -u -t ./...
+    - run: go test -v -race -cover ./...
+    - run: go build ./proximo-server
+    - run: go build ./proximo-client
+
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test
