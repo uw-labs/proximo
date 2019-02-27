@@ -27,13 +27,13 @@ type produceServer struct {
 func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 	sCtx := stream.Context()
 
-	eg, ctx := rungroup.New(sCtx)
+	rg, ctx := rungroup.New(sCtx)
 
 	messages := make(chan *proto.Message)
 	forClient := make(chan *proto.Confirmation)
 	startRequest := make(chan *proto.StartPublishRequest)
 
-	eg.GoAsync(func() error {
+	rg.GoAsync(func() error {
 		started := false
 		for {
 			msg, err := stream.Recv()
@@ -72,7 +72,7 @@ func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 		}
 	})
 
-	eg.GoAsync(func() error {
+	rg.GoAsync(func() error {
 		for {
 			select {
 			case msg := <-forClient:
@@ -85,7 +85,7 @@ func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 		}
 	})
 
-	eg.Go(func() error {
+	rg.Go(func() error {
 		var conf producerConfig
 		select {
 		case sr := <-startRequest:
@@ -97,7 +97,7 @@ func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 		return s.handler.HandleProduce(ctx, conf, forClient, messages)
 	})
 
-	if err := eg.Wait(); err != nil {
+	if err := rg.Wait(); err != nil {
 		return err
 	}
 

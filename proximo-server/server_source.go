@@ -35,13 +35,13 @@ type consumeServer struct {
 func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error {
 	sCtx := stream.Context()
 
-	eg, ctx := rungroup.New(sCtx)
+	rg, ctx := rungroup.New(sCtx)
 
 	forClient := make(chan *proto.Message)
 	confirmRequest := make(chan *proto.Confirmation)
 	startRequest := make(chan *proto.StartConsumeRequest)
 
-	eg.GoAsync(func() error {
+	rg.GoAsync(func() error {
 		started := false
 		for {
 			msg, err := stream.Recv()
@@ -80,7 +80,7 @@ func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error 
 		}
 	})
 
-	eg.GoAsync(func() error {
+	rg.GoAsync(func() error {
 		for {
 			select {
 			case m := <-forClient:
@@ -97,7 +97,7 @@ func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error 
 		}
 	})
 
-	eg.Go(func() error {
+	rg.Go(func() error {
 		var conf consumerConfig
 		select {
 		case sr := <-startRequest:
@@ -110,7 +110,7 @@ func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error 
 		return s.handler.HandleConsume(ctx, conf, forClient, confirmRequest)
 	})
 
-	if err := eg.Wait(); err != nil {
+	if err := rg.Wait(); err != nil {
 		return err
 	}
 
