@@ -8,6 +8,8 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/uw-labs/proximo/internal/proto"
 )
 
 type producerConfig struct {
@@ -15,14 +17,14 @@ type producerConfig struct {
 }
 
 type produceHandler interface {
-	HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error
+	HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error
 }
 
 type produceServer struct {
 	handler produceHandler
 }
 
-func (s *produceServer) Publish(stream MessageSink_PublishServer) error {
+func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 	sCtx := stream.Context()
 
 	// This context with cancel is used when a goroutine
@@ -30,8 +32,9 @@ func (s *produceServer) Publish(stream MessageSink_PublishServer) error {
 	ctx, cancel := context.WithCancel(sCtx)
 	eg, ctx := errgroup.WithContext(ctx)
 
-	startRequest := make(chan *StartPublishRequest)
-	messages := make(chan *Message)
+	messages := make(chan *proto.Message)
+	forClient := make(chan *proto.Confirmation)
+	startRequest := make(chan *proto.StartPublishRequest)
 
 	eg.Go(func() error {
 		defer cancel()
@@ -73,8 +76,6 @@ func (s *produceServer) Publish(stream MessageSink_PublishServer) error {
 			}
 		}
 	})
-
-	forClient := make(chan *Confirmation)
 
 	eg.Go(func() error {
 		defer cancel()

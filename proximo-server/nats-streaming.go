@@ -12,6 +12,8 @@ import (
 	"github.com/nats-io/go-nats"
 	"github.com/nats-io/go-nats-streaming"
 	"github.com/nats-io/go-nats-streaming/pb"
+
+	"github.com/uw-labs/proximo/internal/proto"
 )
 
 type natsStreamingConsumeHandler struct {
@@ -33,7 +35,7 @@ func (h *natsStreamingConsumeHandler) Close() error {
 	return nil
 }
 
-func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *Message, confirmRequest <-chan *Confirmation) error {
+func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
 
 	conn, err := stan.Connect(h.clusterID, conf.consumer+generateID(), stan.NatsConn(h.nc))
 	if err != nil {
@@ -81,7 +83,7 @@ func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, conf co
 		select {
 		case <-ctx.Done():
 			return
-		case forClient <- &Message{Data: msg.Data, Id: strconv.FormatUint(msg.Sequence, 10)}:
+		case forClient <- &proto.Message{Data: msg.Data, Id: strconv.FormatUint(msg.Sequence, 10)}:
 			ackQueue <- msg
 		}
 	}
@@ -140,7 +142,7 @@ func (h *natsStreamingProduceHandler) Close() error {
 	return nil
 }
 
-func (h *natsStreamingProduceHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *Confirmation, messages <-chan *Message) error {
+func (h *natsStreamingProduceHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
 
 	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsConn(h.nc))
 	if err != nil {
@@ -158,7 +160,7 @@ func (h *natsStreamingProduceHandler) HandleProduce(ctx context.Context, conf pr
 				return err
 			}
 			select {
-			case forClient <- &Confirmation{MsgID: msg.GetId()}:
+			case forClient <- &proto.Confirmation{MsgID: msg.GetId()}:
 			case <-ctx.Done():
 				return conn.Close()
 			}

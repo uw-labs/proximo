@@ -14,6 +14,8 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
+
+	"github.com/uw-labs/proximo/internal/proto"
 	"github.com/uw-labs/proximo/proximoc-go"
 )
 
@@ -37,8 +39,8 @@ func Setup() error {
 
 	backend = NewMockBackend()
 
-	RegisterMessageSourceServer(grpcServer, &consumeServer{handler: backend})
-	RegisterMessageSinkServer(grpcServer, &produceServer{handler: backend})
+	proto.RegisterMessageSourceServer(grpcServer, &consumeServer{handler: backend})
+	proto.RegisterMessageSinkServer(grpcServer, &produceServer{handler: backend})
 	go func() { grpcServer.Serve(lis) }()
 
 	// Wait for server to start
@@ -92,7 +94,7 @@ func TestProduceServer_Publish(t *testing.T) {
 
 func TestConsumeServer_Consume(t *testing.T) {
 	assert := require.New(t)
-	expected := []*Message{
+	expected := []*proto.Message{
 		{
 			Id:   uuid.Must(uuid.NewV4()).String(),
 			Data: []byte("consume-message-1"),
