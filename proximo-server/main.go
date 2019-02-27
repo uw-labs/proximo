@@ -115,13 +115,13 @@ func main() {
 			Name:   "ping-interval",
 			Value:  3,
 			Desc:   "interval in seconds for connection pings",
-			EnvVar: "PROXIMO_PING_INTERVAL_SECONDS",
+			EnvVar: "PROXIMO_NATS_PING_INTERVAL_SECONDS",
 		})
 		pingNumTimeouts := cmd.Int(cli.IntOpt{
 			Name:   "num-ping-timeouts",
 			Value:  5,
 			Desc:   "number of pings to time out before connection considered broken",
-			EnvVar: "PROXIMO_NUM_PING_TIMEOUTS",
+			EnvVar: "PROXIMO_NATS_NUM_PING_TIMEOUTS",
 		})
 		cmd.Action = func() {
 			if enabled[consumeEndpoint] {
