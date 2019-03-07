@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/uw-labs/proximo/internal/proto"
-	"github.com/uw-labs/rungroup"
+	"github.com/uw-labs/sync/gogroup"
 )
 
 type producerConfig struct {
@@ -27,13 +27,13 @@ type produceServer struct {
 func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 	sCtx := stream.Context()
 
-	rg, ctx := rungroup.New(sCtx)
+	g, ctx := gogroup.New(sCtx)
 
 	messages := make(chan *proto.Message)
 	forClient := make(chan *proto.Confirmation)
 	startRequest := make(chan *proto.StartPublishRequest)
 
-	rg.GoAsync(func() error {
+	g.Go(func() error {
 		started := false
 		for {
 			msg, err := stream.Recv()
@@ -72,7 +72,7 @@ func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 		}
 	})
 
-	rg.GoAsync(func() error {
+	g.Go(func() error {
 		for {
 			select {
 			case msg := <-forClient:
@@ -85,7 +85,7 @@ func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 		}
 	})
 
-	rg.Go(func() error {
+	g.Go(func() error {
 		var conf producerConfig
 		select {
 		case sr := <-startRequest:
@@ -97,7 +97,7 @@ func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 		return s.handler.HandleProduce(ctx, conf, forClient, messages)
 	})
 
-	if err := rg.Wait(); err != nil {
+	if err := g.Wait(); err != nil {
 		return err
 	}
 

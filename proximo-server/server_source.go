@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/uw-labs/proximo/internal/proto"
-	"github.com/uw-labs/rungroup"
+	"github.com/uw-labs/sync/gogroup"
 )
 
 var (
@@ -35,13 +35,13 @@ type consumeServer struct {
 func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error {
 	sCtx := stream.Context()
 
-	rg, ctx := rungroup.New(sCtx)
+	g, ctx := gogroup.New(sCtx)
 
 	forClient := make(chan *proto.Message)
 	confirmRequest := make(chan *proto.Confirmation)
 	startRequest := make(chan *proto.StartConsumeRequest)
 
-	rg.GoAsync(func() error {
+	g.Go(func() error {
 		started := false
 		for {
 			msg, err := stream.Recv()
@@ -80,7 +80,7 @@ func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error 
 		}
 	})
 
-	rg.GoAsync(func() error {
+	g.Go(func() error {
 		for {
 			select {
 			case m := <-forClient:
@@ -97,7 +97,7 @@ func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error 
 		}
 	})
 
-	rg.Go(func() error {
+	g.Go(func() error {
 		var conf consumerConfig
 		select {
 		case sr := <-startRequest:
@@ -110,7 +110,7 @@ func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error 
 		return s.handler.HandleConsume(ctx, conf, forClient, confirmRequest)
 	})
 
-	if err := rg.Wait(); err != nil {
+	if err := g.Wait(); err != nil {
 		return err
 	}
 
