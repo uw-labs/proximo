@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/nats-io/go-nats"
 	stan "github.com/nats-io/go-nats-streaming"
-	"github.com/nats-io/go-nats-streaming/pb"
 
 	"github.com/uw-labs/proximo/internal/proto"
 )
@@ -107,16 +106,23 @@ func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, conf co
 			return
 		}
 	}
+	opts := []stan.SubscriptionOption{
+		stan.DurableName(conf.consumer),
+		stan.SetManualAckMode(),
+		stan.AckWait(60 * time.Second),
+		stan.MaxInflight(h.maxInflight),
+	}
+	if conf.offset == proto.Offset_OFFSET_NEWEST {
+		opts = append(opts, stan.StartWithLastReceived())
+	} else {
+		opts = append(opts, stan.DeliverAllAvailable())
+	}
 
 	subscription, err := conn.QueueSubscribe(
 		conf.topic,
 		conf.consumer,
 		f,
-		stan.StartAt(pb.StartPosition_First),
-		stan.DurableName(conf.consumer),
-		stan.SetManualAckMode(),
-		stan.AckWait(60*time.Second),
-		stan.MaxInflight(h.maxInflight),
+		opts...,
 	)
 	if err != nil {
 		return err
