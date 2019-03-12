@@ -34,57 +34,11 @@ func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 	startRequest := make(chan *proto.StartPublishRequest)
 
 	g.Go(func() error {
-		started := false
-		for {
-			msg, err := stream.Recv()
-			if err != nil {
-				if err == io.EOF {
-					return nil
-				}
-				if strings.HasSuffix(err.Error(), "context canceled") {
-					return nil
-				}
-				return err
-			}
-			switch {
-			case msg.GetStartRequest() != nil:
-				if started {
-					return errStartedTwice
-				}
-				select {
-				case startRequest <- msg.GetStartRequest():
-				case <-ctx.Done():
-					return nil
-				}
-				started = true
-			case msg.GetMsg() != nil:
-				if !started {
-					return errNotConnected
-				}
-				select {
-				case messages <- msg.GetMsg():
-				case <-ctx.Done():
-					return nil
-				}
-			default:
-				return errInvalidRequest
-			}
-		}
+		return s.receiveMessages(ctx, stream, startRequest, messages)
 	})
-
 	g.Go(func() error {
-		for {
-			select {
-			case msg := <-forClient:
-				if err := stream.Send(msg); err != nil {
-					return err
-				}
-			case <-ctx.Done():
-				return nil
-			}
-		}
+		return s.sendConfirmations(ctx, stream, forClient)
 	})
-
 	g.Go(func() error {
 		var conf producerConfig
 		select {
@@ -105,4 +59,68 @@ func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 		return status.Error(codes.Canceled, err.Error())
 	}
 	return sCtx.Err()
+}
+
+// receiveSinkStream is a subset of proto.MessageSink_PublishServer that only exposes the receive method
+type receiveSinkStream interface {
+	Recv() (*proto.PublisherRequest, error)
+}
+
+// receiveMessages receives messages from the client
+func (s *produceServer) receiveMessages(ctx context.Context, stream receiveSinkStream, startRequest chan<- *proto.StartPublishRequest, messages chan<- *proto.Message) error {
+	started := false
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			if strings.HasSuffix(err.Error(), "context canceled") {
+				return nil
+			}
+			return err
+		}
+		switch {
+		case msg.GetStartRequest() != nil:
+			if started {
+				return errStartedTwice
+			}
+			select {
+			case startRequest <- msg.GetStartRequest():
+			case <-ctx.Done():
+				return nil
+			}
+			started = true
+		case msg.GetMsg() != nil:
+			if !started {
+				return errNotConnected
+			}
+			select {
+			case messages <- msg.GetMsg():
+			case <-ctx.Done():
+				return nil
+			}
+		default:
+			return errInvalidRequest
+		}
+	}
+}
+
+// sendSinkStream is a subset of proto.MessageSink_PublishServer that only exposes the send method
+type sendSinkStream interface {
+	Send(*proto.Confirmation) error
+}
+
+// sendConfirmations sends confirmations back to the client
+func (s *produceServer) sendConfirmations(ctx context.Context, stream sendSinkStream, forClient <-chan *proto.Confirmation) error {
+	for {
+		select {
+		case msg := <-forClient:
+			if err := stream.Send(msg); err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
 }
