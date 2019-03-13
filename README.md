@@ -1,4 +1,4 @@
-# Proximo
+# Proximo [![CircleCI](https://circleci.com/gh/uw-labs/proximo.svg?style=svg)](https://circleci.com/gh/uw-labs/proximo)
 Proximo is a proxy for multiple different publish-subscribe queuing systems.
 
 It is based on a GRPC interface definition, making it easy to create new client libraries.

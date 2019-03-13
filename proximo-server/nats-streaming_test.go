@@ -15,6 +15,7 @@ import (
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"github.com/uw-labs/proximo/internal/proto"
 )
 
 func TestConsumerErrorOnBackendDisconnect(t *testing.T) {
@@ -51,8 +52,8 @@ func TestConsumerErrorOnBackendDisconnect(t *testing.T) {
 	require.NoError(t, err)
 	success := make(chan struct{})
 	egrp, groupCtx := errgroup.WithContext(ctx)
-	forClient := make(chan *Message)
-	acks := make(chan *Confirmation)
+	forClient := make(chan *proto.Message)
+	acks := make(chan *proto.Confirmation)
 	egrp.Go(func() error {
 		for msg := range forClient {
 			val, _ := strconv.Atoi(string(msg.Data))
@@ -60,7 +61,7 @@ func TestConsumerErrorOnBackendDisconnect(t *testing.T) {
 				t.Log("close proxy after 10 msgs")
 				proxy.Stop() // close proxy after 10 msgs
 			}
-			acks <- &Confirmation{MsgID: msg.Id}
+			acks <- &proto.Confirmation{MsgID: msg.Id}
 		}
 		return nil
 	})
