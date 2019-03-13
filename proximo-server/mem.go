@@ -114,7 +114,7 @@ func (h memHandler) loop() {
 						select {
 						case <-sub.ctx.Done():
 							// drop expired consumers
-						case sub.msgs <- &proto.Message{inm.message.GetData(), generateID()}:
+						case sub.msgs <- &proto.Message{Data: inm.message.GetData(), Id: generateID()}:
 							remaining = append(remaining, sub)
 							sentOne = true
 						}
@@ -124,7 +124,7 @@ func (h memHandler) loop() {
 				}
 			}
 
-			h.last100[inm.topic] = append(h.last100[inm.topic], &proto.Message{inm.message.GetData(), generateID()})
+			h.last100[inm.topic] = append(h.last100[inm.topic], &proto.Message{Data: inm.message.GetData(), Id: generateID()})
 			for len(h.last100[inm.topic]) > 100 {
 				h.last100[inm.topic] = h.last100[inm.topic][1:]
 			}

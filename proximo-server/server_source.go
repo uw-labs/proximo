@@ -22,6 +22,7 @@ var (
 type consumerConfig struct {
 	consumer string
 	topic    string
+	offset   proto.Offset
 }
 
 type consumeHandler interface {
@@ -103,6 +104,7 @@ func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error 
 		case sr := <-startRequest:
 			conf.topic = sr.GetTopic()
 			conf.consumer = sr.GetConsumer()
+			conf.offset = sr.GetInitialOffset()
 		case <-ctx.Done():
 			return nil
 		}

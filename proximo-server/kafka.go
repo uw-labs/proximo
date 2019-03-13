@@ -25,10 +25,19 @@ func (h *kafkaConsumeHandler) HandleConsume(ctx context.Context, conf consumerCo
 
 	errors := make(chan error)
 
+	var offset int64
+	switch conf.offset {
+	case proto.Offset_OFFSET_DEFAULT, proto.Offset_OFFSET_OLDEST:
+		offset = sarama.OffsetOldest
+	case proto.Offset_OFFSET_NEWEST:
+		offset = sarama.OffsetNewest
+	default:
+		offset = sarama.OffsetOldest
+	}
 	// TODO: un hardcode some of this stuff
 	config := cluster.NewConfig()
 	config.Consumer.Return.Errors = true
-	config.Consumer.Offsets.Initial = sarama.OffsetOldest
+	config.Consumer.Offsets.Initial = offset
 	config.Metadata.RefreshFrequency = 30 * time.Second
 	if h.version != nil {
 		config.Version = *h.version
