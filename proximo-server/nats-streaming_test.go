@@ -15,7 +15,7 @@ import (
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"github.com/uw-labs/proximo/internal/proto"
+	"github.com/uw-labs/proximo/proto"
 )
 
 func TestConsumerErrorOnBackendDisconnect(t *testing.T) {

@@ -15,7 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uw-labs/proximo/internal/proto"
+	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/proximo/proximoc-go"
 )
 

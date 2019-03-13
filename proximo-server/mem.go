@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/uw-labs/proximo/internal/proto"
+	"github.com/uw-labs/proximo/proto"
 )
 
 func newMemHandler() *memHandler {

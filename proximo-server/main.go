@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/uw-labs/proximo/internal/proto"
+	"github.com/uw-labs/proximo/proto"
 )
 
 const (
