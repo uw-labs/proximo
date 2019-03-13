@@ -66,7 +66,7 @@ func TestConsumerErrorOnBackendDisconnect(t *testing.T) {
 		return nil
 	})
 	egrp.Go(func() error {
-		err := hnd.HandleConsume(groupCtx, consumerConfig{"test", "test"}, forClient, acks)
+		err := hnd.HandleConsume(groupCtx, consumerConfig{consumer: "test", topic: "test"}, forClient, acks)
 		if err != nil && err != context.Canceled {
 			t.Log(err)
 			close(success) // our handler returned the error from the ping timeout
