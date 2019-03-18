@@ -40,7 +40,7 @@ func Setup() error {
 	backend = NewMockBackend()
 
 	proto.RegisterMessageSourceServer(grpcServer, &consumeServer{handler: backend})
-	proto.RegisterMessageSinkServer(grpcServer, &produceServer{handler: backend})
+	proto.RegisterMessageSinkServer(grpcServer, &SinkServer{sinkFactory: backend})
 	go func() { grpcServer.Serve(lis) }()
 
 	// Wait for server to start

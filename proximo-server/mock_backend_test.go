@@ -7,7 +7,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/pkg/errors"
 	"github.com/uw-labs/proximo/proto"
+	"github.com/uw-labs/substrate"
 )
 
 // MockBackend is a simple backend implementation that allows one consumer or publisher at a time and
@@ -94,38 +96,66 @@ func (b *MockBackend) HandleConsume(ctx context.Context, conf consumerConfig, fo
 	}
 }
 
-func (b *MockBackend) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+func (b *MockBackend) NewAsyncSink(ctx context.Context, cfg producerConfig) (substrate.AsyncMessageSink, error) {
+	return &mockSink{
+		backend: b,
+		config:  cfg,
+	}, nil
+}
 
-	msgs, ok := b.messages[conf.topic]
+type mockSink struct {
+	backend *MockBackend
+	config  producerConfig
+}
+
+func (sink *mockSink) PublishMessages(ctx context.Context, acks chan<- substrate.Message, messages <-chan substrate.Message) error {
+	sink.backend.mutex.Lock()
+	defer sink.backend.mutex.Unlock()
+
+	msgs, ok := sink.backend.messages[sink.config.topic]
 	if !ok {
 		msgs = make([]*proto.Message, 0)
 	}
 	defer func() {
-		b.messages[conf.topic] = msgs
+		sink.backend.messages[sink.config.topic] = msgs
 	}()
 
-	toConfirm := make([]*proto.Confirmation, 0)
+	toConfirm := make([]substrate.Message, 0)
 	for {
 		if len(toConfirm) == 0 {
 			select {
 			case <-ctx.Done():
 				return nil
 			case msg := <-messages:
-				msgs = append(msgs, msg)
-				toConfirm = append(toConfirm, &proto.Confirmation{MsgID: msg.Id})
+				pMsg, ok := msg.(proximoMsg)
+				if !ok {
+					return errors.Errorf("unexpected message: %v", msg)
+				}
+				msgs = append(msgs, pMsg.msg)
+				toConfirm = append(toConfirm, msg)
 			}
 		} else {
 			select {
 			case <-ctx.Done():
 				return nil
 			case msg := <-messages:
-				msgs = append(msgs, msg)
-				toConfirm = append(toConfirm, &proto.Confirmation{MsgID: msg.Id})
-			case forClient <- toConfirm[0]:
+				pMsg, ok := msg.(proximoMsg)
+				if !ok {
+					return errors.Errorf("unexpected message: %v", msg)
+				}
+				msgs = append(msgs, pMsg.msg)
+				toConfirm = append(toConfirm, msg)
+			case acks <- toConfirm[0]:
 				toConfirm = toConfirm[1:]
 			}
 		}
 	}
+}
+
+func (sink *mockSink) Close() error {
+	return nil
+}
+
+func (sink *mockSink) Status() (*substrate.Status, error) {
+	panic("not implemented")
 }

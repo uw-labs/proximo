@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/uw-labs/proximo/proto"
+	"github.com/uw-labs/substrate"
 )
 
 func newMemHandler() *memHandler {
@@ -23,6 +24,13 @@ type memHandler struct {
 	last100 map[string][]*proto.Message
 }
 
+func (h *memHandler) NewAsyncSink(ctx context.Context, cfg producerConfig) (substrate.AsyncMessageSink, error) {
+	return memSink{
+		backend: h,
+		cfg:     cfg,
+	}, nil
+}
+
 func (h *memHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -39,9 +47,14 @@ func (h *memHandler) HandleConsume(ctx context.Context, conf consumerConfig, for
 	}
 }
 
-func (h *memHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
-	idsToConfirm := make(chan string)
-	go h.sendConfirmations(ctx, forClient, idsToConfirm)
+type memSink struct {
+	backend *memHandler
+	cfg     producerConfig
+}
+
+func (s memSink) PublishMessages(ctx context.Context, acks chan<- substrate.Message, messages <-chan substrate.Message) error {
+	toAck := make(chan substrate.Message)
+	go s.sendConfirmations(ctx, acks, toAck)
 
 	for {
 		select {
@@ -49,12 +62,12 @@ func (h *memHandler) HandleProduce(ctx context.Context, conf producerConfig, for
 			return nil
 		case msg := <-messages:
 			select {
-			case h.incomingMessages <- &produceReq{conf.topic, msg}:
-			case <-ctx.Done():
-				return nil
-			}
-			select {
-			case idsToConfirm <- msg.GetId():
+			case s.backend.incomingMessages <- &produceReq{topic: s.cfg.topic, message: msg}:
+				select {
+				case acks <- msg:
+				case <-ctx.Done():
+					return nil
+				}
 			case <-ctx.Done():
 				return nil
 			}
@@ -62,27 +75,35 @@ func (h *memHandler) HandleProduce(ctx context.Context, conf producerConfig, for
 	}
 }
 
-func (h *memHandler) sendConfirmations(ctx context.Context, forClient chan<- *proto.Confirmation, idsToConfirm <-chan string) {
-	toConfirm := make([]string, 0)
+func (s memSink) sendConfirmations(ctx context.Context, acks chan<- substrate.Message, toAck <-chan substrate.Message) {
+	toConfirm := make([]substrate.Message, 0)
 	for {
 		if len(toConfirm) == 0 {
 			select {
 			case <-ctx.Done():
 				return
-			case ids := <-idsToConfirm:
-				toConfirm = append(toConfirm, ids)
+			case msg := <-toAck:
+				toConfirm = append(toConfirm, msg)
 			}
 		} else {
 			select {
 			case <-ctx.Done():
 				return
-			case ids := <-idsToConfirm:
+			case ids := <-toAck:
 				toConfirm = append(toConfirm, ids)
-			case forClient <- &proto.Confirmation{MsgID: toConfirm[0]}:
+			case acks <- toConfirm[0]:
 				toConfirm = toConfirm[1:]
 			}
 		}
 	}
+}
+
+func (s memSink) Close() error {
+	return nil
+}
+
+func (s memSink) Status() (*substrate.Status, error) {
+	panic("not implemented")
 }
 
 func (h memHandler) loop() {
@@ -114,7 +135,7 @@ func (h memHandler) loop() {
 						select {
 						case <-sub.ctx.Done():
 							// drop expired consumers
-						case sub.msgs <- &proto.Message{Data: inm.message.GetData(), Id: generateID()}:
+						case sub.msgs <- &proto.Message{Data: inm.message.Data(), Id: generateID()}:
 							remaining = append(remaining, sub)
 							sentOne = true
 						}
@@ -124,7 +145,7 @@ func (h memHandler) loop() {
 				}
 			}
 
-			h.last100[inm.topic] = append(h.last100[inm.topic], &proto.Message{Data: inm.message.GetData(), Id: generateID()})
+			h.last100[inm.topic] = append(h.last100[inm.topic], &proto.Message{Data: inm.message.Data(), Id: generateID()})
 			for len(h.last100[inm.topic]) > 100 {
 				h.last100[inm.topic] = h.last100[inm.topic][1:]
 			}
@@ -134,7 +155,7 @@ func (h memHandler) loop() {
 
 type produceReq struct {
 	topic   string
-	message *proto.Message
+	message substrate.Message
 }
 
 type sub struct {

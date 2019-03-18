@@ -13,6 +13,8 @@ import (
 	stan "github.com/nats-io/go-nats-streaming"
 
 	"github.com/uw-labs/proximo/proto"
+	"github.com/uw-labs/substrate"
+	"github.com/uw-labs/substrate/natsstreaming"
 )
 
 type natsStreamingConsumeHandler struct {
@@ -152,48 +154,16 @@ func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, conf co
 
 }
 
-type natsStreamingProduceHandler struct {
-	clusterID   string
-	maxInflight int
-	nc          *nats.Conn
+type NATSStreamingAsyncMessageFactory struct {
+	url       string
+	clusterID string
 }
 
-func newNatsStreamingProduceHandler(url, clusterID string, maxInflight int) (*natsStreamingProduceHandler, error) {
-	nc, err := nats.Connect(url, nats.Name("proximo-nats-streaming-"+generateID()))
-	if err != nil {
-		return nil, err
-	}
-	return &natsStreamingProduceHandler{nc: nc, clusterID: clusterID, maxInflight: maxInflight}, nil
-}
-
-func (h *natsStreamingProduceHandler) Close() error {
-	h.nc.Close()
-	return nil
-}
-
-func (h *natsStreamingProduceHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
-
-	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsConn(h.nc))
-	if err != nil {
-		return err
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return conn.Close()
-		case msg := <-messages:
-			err := conn.Publish(conf.topic, msg.GetData())
-			if err != nil {
-				conn.Close()
-				return err
-			}
-			select {
-			case forClient <- &proto.Confirmation{MsgID: msg.GetId()}:
-			case <-ctx.Done():
-				return conn.Close()
-			}
-		}
-	}
-
+func (f NATSStreamingAsyncMessageFactory) NewAsyncSink(ctx context.Context, cfg producerConfig) (substrate.AsyncMessageSink, error) {
+	return natsstreaming.NewAsyncMessageSink(natsstreaming.AsyncMessageSinkConfig{
+		URL:       f.url,
+		ClusterID: f.clusterID,
+		ClientID:  "proximo" + generateID(),
+		Subject:   cfg.topic,
+	})
 }

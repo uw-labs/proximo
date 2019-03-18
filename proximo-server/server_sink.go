@@ -8,7 +8,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/pkg/errors"
 	"github.com/uw-labs/proximo/proto"
+	"github.com/uw-labs/substrate"
 	"github.com/uw-labs/sync/gogroup"
 )
 
@@ -16,28 +18,28 @@ type producerConfig struct {
 	topic string
 }
 
-type produceHandler interface {
-	HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error
+type AsyncSinkFactory interface {
+	NewAsyncSink(ctx context.Context, conf producerConfig) (substrate.AsyncMessageSink, error)
 }
 
-type produceServer struct {
-	handler produceHandler
+type SinkServer struct {
+	sinkFactory AsyncSinkFactory
 }
 
-func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
+func (s *SinkServer) Publish(stream proto.MessageSink_PublishServer) error {
 	sCtx := stream.Context()
 
 	g, ctx := gogroup.New(sCtx)
 
-	messages := make(chan *proto.Message)
-	forClient := make(chan *proto.Confirmation)
+	messages := make(chan substrate.Message)
+	acks := make(chan substrate.Message)
 	startRequest := make(chan *proto.StartPublishRequest)
 
 	g.Go(func() error {
 		return s.receiveMessages(ctx, stream, startRequest, messages)
 	})
 	g.Go(func() error {
-		return s.sendConfirmations(ctx, stream, forClient)
+		return s.sendConfirmations(ctx, stream, acks)
 	})
 	g.Go(func() error {
 		var conf producerConfig
@@ -48,7 +50,13 @@ func (s *produceServer) Publish(stream proto.MessageSink_PublishServer) error {
 			return nil
 		}
 
-		return s.handler.HandleProduce(ctx, conf, forClient, messages)
+		sink, err := s.sinkFactory.NewAsyncSink(ctx, conf)
+		if err != nil {
+			return err
+		}
+		defer sink.Close()
+
+		return sink.PublishMessages(ctx, acks, messages)
 	})
 
 	if err := g.Wait(); err != nil {
@@ -67,7 +75,7 @@ type receiveSinkStream interface {
 }
 
 // receiveMessages receives messages from the client
-func (s *produceServer) receiveMessages(ctx context.Context, stream receiveSinkStream, startRequest chan<- *proto.StartPublishRequest, messages chan<- *proto.Message) error {
+func (s *SinkServer) receiveMessages(ctx context.Context, stream receiveSinkStream, startRequest chan<- *proto.StartPublishRequest, messages chan<- substrate.Message) error {
 	started := false
 	for {
 		msg, err := stream.Recv()
@@ -96,7 +104,7 @@ func (s *produceServer) receiveMessages(ctx context.Context, stream receiveSinkS
 				return errNotConnected
 			}
 			select {
-			case messages <- msg.GetMsg():
+			case messages <- proximoMsg{msg: msg.GetMsg()}:
 			case <-ctx.Done():
 				return nil
 			}
@@ -112,15 +120,27 @@ type sendSinkStream interface {
 }
 
 // sendConfirmations sends confirmations back to the client
-func (s *produceServer) sendConfirmations(ctx context.Context, stream sendSinkStream, forClient <-chan *proto.Confirmation) error {
+func (s *SinkServer) sendConfirmations(ctx context.Context, stream sendSinkStream, forClient <-chan substrate.Message) error {
 	for {
 		select {
 		case msg := <-forClient:
-			if err := stream.Send(msg); err != nil {
+			pMsg, ok := msg.(proximoMsg)
+			if !ok {
+				return errors.Errorf("unexpected message: %v", pMsg)
+			}
+			if err := stream.Send(&proto.Confirmation{MsgID: pMsg.msg.Id}); err != nil {
 				return err
 			}
 		case <-ctx.Done():
 			return nil
 		}
 	}
+}
+
+type proximoMsg struct {
+	msg *proto.Message
+}
+
+func (m proximoMsg) Data() []byte {
+	return m.msg.Data
 }

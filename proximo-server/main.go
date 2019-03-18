@@ -27,9 +27,9 @@ const (
 
 func main() {
 	var (
-		cHandler consumeHandler
-		pHandler produceHandler
-		enabled  map[string]bool
+		cHandler    consumeHandler
+		sinkFactory AsyncSinkFactory
+		enabled     map[string]bool
 	)
 
 	app := cli.App("proximo", "GRPC Proxy gateway for message queue systems")
@@ -84,7 +84,7 @@ func main() {
 				}
 			}
 			if enabled[publishEndpoint] {
-				pHandler = &kafkaProduceHandler{
+				sinkFactory = &KafkaAsyncSinkFactory{
 					brokers: brokers,
 					version: version,
 				}
@@ -135,12 +135,10 @@ func main() {
 				defer h.Close()
 			}
 			if enabled[publishEndpoint] {
-				h, err := newNatsStreamingProduceHandler(*url, *cid, *maxInflight)
-				if err != nil {
-					log.Fatalf("failed to connect to nats streaming for production: %v", err)
+				sinkFactory = NATSStreamingAsyncMessageFactory{
+					url:       *url,
+					clusterID: *cid,
 				}
-				pHandler = h
-				defer h.Close()
 			}
 
 			log.Printf("Using NATS streaming server at %s with cluster id %s and max inflight %v\n", *url, *cid, *maxInflight)
@@ -155,7 +153,7 @@ func main() {
 				cHandler = h
 			}
 			if enabled[publishEndpoint] {
-				pHandler = h
+				sinkFactory = h
 			}
 
 			log.Printf("Using in memory testing backend")
@@ -165,7 +163,7 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
-	log.Fatal(listenAndServe(cHandler, pHandler, *port))
+	log.Fatal(listenAndServe(cHandler, sinkFactory, *port))
 }
 
 func parseEndpoints(endpoints string) map[string]bool {
@@ -183,7 +181,7 @@ func parseEndpoints(endpoints string) map[string]bool {
 
 	return enabled
 }
-func listenAndServe(cHandler consumeHandler, pHandler produceHandler, port int) error {
+func listenAndServe(cHandler consumeHandler, sinkFactory AsyncSinkFactory, port int) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return errors.Wrap(err, "failed to listen")
@@ -201,8 +199,8 @@ func listenAndServe(cHandler consumeHandler, pHandler produceHandler, port int) 
 	if cHandler != nil {
 		proto.RegisterMessageSourceServer(grpcServer, &consumeServer{handler: cHandler})
 	}
-	if pHandler != nil {
-		proto.RegisterMessageSinkServer(grpcServer, &produceServer{handler: pHandler})
+	if sinkFactory != nil {
+		proto.RegisterMessageSinkServer(grpcServer, &SinkServer{sinkFactory: sinkFactory})
 	}
 
 	errCh := make(chan error, 1)

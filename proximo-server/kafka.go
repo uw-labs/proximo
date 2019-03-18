@@ -13,6 +13,8 @@ import (
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/uw-labs/proximo/proto"
+	"github.com/uw-labs/substrate"
+	"github.com/uw-labs/substrate/kafka"
 )
 
 type kafkaConsumeHandler struct {
@@ -132,41 +134,15 @@ func (h *kafkaConsumeHandler) confirm(ctx context.Context, c *cluster.Consumer, 
 	return nil
 }
 
-type kafkaProduceHandler struct {
+type KafkaAsyncSinkFactory struct {
 	brokers []string
 	version *sarama.KafkaVersion
 }
 
-func (h *kafkaProduceHandler) HandleProduce(ctx context.Context, cfg producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
-	conf := sarama.NewConfig()
-	conf.Producer.Return.Successes = true
-	conf.Producer.RequiredAcks = sarama.WaitForAll
-	conf.Producer.Return.Errors = true
-	conf.Producer.Retry.Max = 3
-	conf.Producer.Timeout = time.Duration(60) * time.Second
-
-	sp, err := sarama.NewSyncProducer(h.brokers, conf)
-	if err != nil {
-		return err
-	}
-	defer sp.Close()
-
-	for {
-		select {
-		case m := <-messages:
-			pm := &sarama.ProducerMessage{
-				Topic: cfg.topic,
-				Value: sarama.ByteEncoder(m.GetData()),
-				// Key = TODO:
-			}
-
-			_, _, err = sp.SendMessage(pm)
-			if err != nil {
-				return err
-			}
-			forClient <- &proto.Confirmation{MsgID: m.GetId()}
-		case <-ctx.Done():
-			return nil
-		}
-	}
+func (f KafkaAsyncSinkFactory) NewAsyncSink(ctx context.Context, cfg producerConfig) (substrate.AsyncMessageSink, error) {
+	return kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
+		Topic:   cfg.topic,
+		Brokers: f.brokers,
+		Version: f.version,
+	})
 }
