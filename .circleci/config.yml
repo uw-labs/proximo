@@ -5,12 +5,14 @@ jobs:
     working_directory: /go/src/github.com/uw-labs/proximo
     docker:
     - image: circleci/golang:1.12
+      environment:
+        GO111MODULE: "on"
     steps:
     - checkout
     - run: go get -t -d -v ./...
     - run: go test -v -race -cover ./...
-    - run: go build -o ./bin/sever ./proximo-server
-    - run: go build -o ./bin/client ./proximo-client
+    - run: go build -o ./bin/sever ./cmd/proximo-server
+    - run: go build -o ./bin/client ./cmd/proximo-client
 
 workflows:
   version: 2
