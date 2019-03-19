@@ -14,12 +14,12 @@ import (
 	"github.com/uw-labs/sync/gogroup"
 )
 
-type producerConfig struct {
-	topic string
+type SinkConfig struct {
+	Topic string
 }
 
 type AsyncSinkFactory interface {
-	NewAsyncSink(ctx context.Context, conf producerConfig) (substrate.AsyncMessageSink, error)
+	NewAsyncSink(ctx context.Context, config SinkConfig) (substrate.AsyncMessageSink, error)
 }
 
 type SinkServer struct {
@@ -42,15 +42,15 @@ func (s *SinkServer) Publish(stream proto.MessageSink_PublishServer) error {
 		return s.sendConfirmations(ctx, stream, acks)
 	})
 	g.Go(func() error {
-		var conf producerConfig
+		var config SinkConfig
 		select {
 		case sr := <-startRequest:
-			conf.topic = sr.GetTopic()
+			config.Topic = sr.GetTopic()
 		case <-ctx.Done():
 			return nil
 		}
 
-		sink, err := s.sinkFactory.NewAsyncSink(ctx, conf)
+		sink, err := s.sinkFactory.NewAsyncSink(ctx, config)
 		if err != nil {
 			return err
 		}

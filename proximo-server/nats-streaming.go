@@ -159,11 +159,11 @@ type NATSStreamingAsyncMessageFactory struct {
 	clusterID string
 }
 
-func (f NATSStreamingAsyncMessageFactory) NewAsyncSink(ctx context.Context, cfg producerConfig) (substrate.AsyncMessageSink, error) {
+func (f NATSStreamingAsyncMessageFactory) NewAsyncSink(ctx context.Context, config SinkConfig) (substrate.AsyncMessageSink, error) {
 	return natsstreaming.NewAsyncMessageSink(natsstreaming.AsyncMessageSinkConfig{
 		URL:       f.url,
 		ClusterID: f.clusterID,
 		ClientID:  "proximo" + generateID(),
-		Subject:   cfg.topic,
+		Subject:   config.Topic,
 	})
 }

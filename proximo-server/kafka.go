@@ -139,9 +139,9 @@ type KafkaAsyncSinkFactory struct {
 	version *sarama.KafkaVersion
 }
 
-func (f KafkaAsyncSinkFactory) NewAsyncSink(ctx context.Context, cfg producerConfig) (substrate.AsyncMessageSink, error) {
+func (f KafkaAsyncSinkFactory) NewAsyncSink(ctx context.Context, config SinkConfig) (substrate.AsyncMessageSink, error) {
 	return kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
-		Topic:   cfg.topic,
+		Topic:   config.Topic,
 		Brokers: f.brokers,
 		Version: f.version,
 	})

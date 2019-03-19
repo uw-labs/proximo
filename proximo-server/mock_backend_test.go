@@ -96,28 +96,28 @@ func (b *MockBackend) HandleConsume(ctx context.Context, conf consumerConfig, fo
 	}
 }
 
-func (b *MockBackend) NewAsyncSink(ctx context.Context, cfg producerConfig) (substrate.AsyncMessageSink, error) {
+func (b *MockBackend) NewAsyncSink(ctx context.Context, config SinkConfig) (substrate.AsyncMessageSink, error) {
 	return &mockSink{
 		backend: b,
-		config:  cfg,
+		config:  config,
 	}, nil
 }
 
 type mockSink struct {
 	backend *MockBackend
-	config  producerConfig
+	config  SinkConfig
 }
 
 func (sink *mockSink) PublishMessages(ctx context.Context, acks chan<- substrate.Message, messages <-chan substrate.Message) error {
 	sink.backend.mutex.Lock()
 	defer sink.backend.mutex.Unlock()
 
-	msgs, ok := sink.backend.messages[sink.config.topic]
+	msgs, ok := sink.backend.messages[sink.config.Topic]
 	if !ok {
 		msgs = make([]*proto.Message, 0)
 	}
 	defer func() {
-		sink.backend.messages[sink.config.topic] = msgs
+		sink.backend.messages[sink.config.Topic] = msgs
 	}()
 
 	toConfirm := make([]substrate.Message, 0)

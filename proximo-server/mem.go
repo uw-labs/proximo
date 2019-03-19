@@ -24,10 +24,10 @@ type memHandler struct {
 	last100 map[string][]*proto.Message
 }
 
-func (h *memHandler) NewAsyncSink(ctx context.Context, cfg producerConfig) (substrate.AsyncMessageSink, error) {
+func (h *memHandler) NewAsyncSink(ctx context.Context, config SinkConfig) (substrate.AsyncMessageSink, error) {
 	return memSink{
 		backend: h,
-		cfg:     cfg,
+		config:  config,
 	}, nil
 }
 
@@ -49,7 +49,7 @@ func (h *memHandler) HandleConsume(ctx context.Context, conf consumerConfig, for
 
 type memSink struct {
 	backend *memHandler
-	cfg     producerConfig
+	config  SinkConfig
 }
 
 func (s memSink) PublishMessages(ctx context.Context, acks chan<- substrate.Message, messages <-chan substrate.Message) error {
@@ -62,7 +62,7 @@ func (s memSink) PublishMessages(ctx context.Context, acks chan<- substrate.Mess
 			return nil
 		case msg := <-messages:
 			select {
-			case s.backend.incomingMessages <- &produceReq{topic: s.cfg.topic, message: msg}:
+			case s.backend.incomingMessages <- &produceReq{topic: s.config.Topic, message: msg}:
 				select {
 				case acks <- msg:
 				case <-ctx.Done():
