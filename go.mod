@@ -31,7 +31,7 @@ require (
 	github.com/sirupsen/logrus v1.4.0 // indirect
 	github.com/stretchr/testify v1.2.2
 	github.com/urfave/cli v1.20.0
-	github.com/uw-labs/substrate v0.0.0-20190313182028-3757230253b7
+	github.com/uw-labs/substrate v0.0.0-20190319174501-f1f3ae6bea68
 	github.com/uw-labs/sync v0.0.0-20190307114256-1bb306bf6e71
 	go.etcd.io/bbolt v1.3.2 // indirect
 	golang.org/x/net v0.0.0-20190318221613-d196dffd7c2b

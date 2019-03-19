@@ -85,7 +85,7 @@ func TestProduceServer_Publish(t *testing.T) {
 	})
 	assert.NoError(err)
 	client := substrate.NewSynchronousMessageSink(sink)
-	defer func() { client.Close() }()
+	defer client.Close()
 
 	for _, data := range toPublish {
 		assert.NoError(client.PublishMessage(ctx, &substrateMsg{data: data}))

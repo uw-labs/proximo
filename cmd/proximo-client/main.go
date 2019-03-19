@@ -6,9 +6,12 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/urfave/cli"
-	proximoc "github.com/uw-labs/proximo/proximoc-go"
+	"github.com/uw-labs/substrate"
+	"github.com/uw-labs/substrate/proximo"
 )
 
 func main() {
@@ -48,44 +51,73 @@ func main() {
 	}
 }
 
-func consume(endpoint string, topic string, consumerid string) error {
-	if err := proximoc.ConsumeContext(
-		context.Background(),
-		endpoint,
-		consumerid,
-		topic,
-		func(m *proximoc.Message) error {
-			fmt.Printf("%s", m.GetData())
-			return nil
-		}); err != nil {
+func consume(endpoint string, topic string, consumerID string) error {
+	source, err := proximo.NewAsyncMessageSource(proximo.AsyncMessageSourceConfig{
+		Broker:        endpoint,
+		Topic:         topic,
+		Offset:        proximo.OffsetOldest,
+		ConsumerGroup: consumerID,
+		Insecure:      true,
+	})
+	if err != nil {
 		return err
 	}
-	return nil
+	client := substrate.NewSynchronousMessageSource(source)
+	defer client.Close()
+
+	err = client.ConsumeMessages(
+		newContext(),
+		func(_ context.Context, msg substrate.Message) error {
+			fmt.Printf("%s", msg.Data())
+			return nil
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return client.Close()
 }
 
 func produce(endpoint string, topic string) error {
-	c, err := proximoc.DialProducer(
-		context.Background(),
-		endpoint,
-		topic,
-	)
+	sink, err := proximo.NewAsyncMessageSink(proximo.AsyncMessageSinkConfig{
+		Broker:   endpoint,
+		Topic:    topic,
+		Insecure: true,
+	})
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+	client := substrate.NewSynchronousMessageSink(sink)
+	defer client.Close()
 
 	all, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
 		return err
 	}
 
-	err = c.Produce(all)
-	if err != nil {
+	if err = client.PublishMessage(newContext(), &substrateMsg{data: all}); err != nil {
 		return err
 	}
 
-	err = c.Close()
-	if err != nil {
-		return err
-	}
-	return nil
+	return client.Close()
+}
+
+func newContext() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		sCh := make(chan os.Signal)
+		signal.Notify(sCh, os.Interrupt, syscall.SIGTERM)
+		<-sCh
+		cancel()
+	}()
+	return ctx
+}
+
+type substrateMsg struct {
+	data []byte
+}
+
+func (msg *substrateMsg) Data() []byte {
+	return msg.data
 }
