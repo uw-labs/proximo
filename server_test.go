@@ -16,8 +16,8 @@ import (
 
 	"github.com/uw-labs/proximo/backend/mock"
 	"github.com/uw-labs/proximo/proto"
-	"github.com/uw-labs/proximo/proximoc-go"
 	"github.com/uw-labs/substrate"
+	proximoc "github.com/uw-labs/substrate/proximo"
 )
 
 var (
@@ -78,13 +78,19 @@ func TestProduceServer_Publish(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	client, err := proximoc.DialProducer(ctx, "localhost:6868", "publish-test")
+	sink, err := proximoc.NewAsyncMessageSink(proximoc.AsyncMessageSinkConfig{
+		Broker:   "localhost:6868",
+		Topic:    "publish-test",
+		Insecure: true,
+	})
 	assert.NoError(err)
-	defer func() { assert.NoError(client.Close()) }()
+	client := substrate.NewSynchronousMessageSink(sink)
+	defer func() { client.Close() }()
 
-	for _, msg := range toPublish {
-		assert.NoError(client.Produce(msg))
+	for _, data := range toPublish {
+		assert.NoError(client.PublishMessage(ctx, &substrateMsg{data: data}))
 	}
+	assert.NoError(client.Close())
 
 	published := backend.GetTopic("publish-test")
 	assert.Equal(len(toPublish), len(published))
@@ -96,29 +102,29 @@ func TestProduceServer_Publish(t *testing.T) {
 func TestConsumeServer_Consume(t *testing.T) {
 	assert := require.New(t)
 	expected := []substrate.Message{
-		&proximoMsg{
-			msg: &proto.Message{
-				Data: []byte("consume-message-1"),
-			},
-		},
-		&proximoMsg{
-			msg: &proto.Message{
-				Data: []byte("consume-message-2"),
-			},
-		},
-		&proximoMsg{
-			msg: &proto.Message{
-				Data: []byte("consume-message-3"),
-			},
-		},
+		&substrateMsg{data: []byte("consume-message-1")},
+		&substrateMsg{data: []byte("consume-message-2")},
+		&substrateMsg{data: []byte("consume-message-3")},
+		&substrateMsg{data: []byte("consume-message-4")},
+		&substrateMsg{data: []byte("consume-message-5")},
 	}
 	backend.SetTopic("consume-test", expected)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
-	consumed := make([]*proximoc.Message, 0, 3)
-	err := proximoc.ConsumeContext(ctx, "localhost:6868", "test-consumer", "consume-test", func(msg *proximoc.Message) error {
+	source, err := proximoc.NewAsyncMessageSource(proximoc.AsyncMessageSourceConfig{
+		Broker:        "localhost:6868",
+		Topic:         "consume-test",
+		ConsumerGroup: "test-consumer-group",
+		Insecure:      true,
+	})
+	assert.NoError(err)
+	client := substrate.NewSynchronousMessageSource(source)
+	defer func() { assert.NoError(client.Close()) }()
+
+	consumed := make([]substrate.Message, 0, len(expected))
+	err = client.ConsumeMessages(ctx, func(_ context.Context, msg substrate.Message) error {
 		consumed = append(consumed, msg)
 		return nil
 	})
@@ -126,6 +132,14 @@ func TestConsumeServer_Consume(t *testing.T) {
 	assert.Equal(len(expected), len(consumed))
 
 	for i, msg := range expected {
-		assert.Equal(msg.Data(), consumed[i].Data)
+		assert.Equal(msg.Data(), consumed[i].Data())
 	}
+}
+
+type substrateMsg struct {
+	data []byte
+}
+
+func (msg *substrateMsg) Data() []byte {
+	return msg.data
 }
