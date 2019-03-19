@@ -1,4 +1,4 @@
-package main
+package mock
 
 import (
 	"context"
@@ -11,22 +11,22 @@ import (
 	"github.com/uw-labs/substrate"
 )
 
-// MockBackend is a simple backend implementation that allows one consumer or publisher at a time and
+// Backend is a simple mock backend implementation that allows one consumer or publisher at a time and
 // allows user to set the messages to be consumed or check the messages that were produced.
-type MockBackend struct {
+type Backend struct {
 	mutex    sync.Mutex
 	messages map[string][]substrate.Message
 }
 
-// NewMockBackend returns a new instance of the mock backend.
-func NewMockBackend() *MockBackend {
-	return &MockBackend{
+// NewBackend returns a new instance of the mock backend.
+func NewBackend() *Backend {
+	return &Backend{
 		messages: make(map[string][]substrate.Message),
 	}
 }
 
 // GetTopic returns all messages published to a given topic.
-func (b *MockBackend) GetTopic(topic string) []substrate.Message {
+func (b *Backend) GetTopic(topic string) []substrate.Message {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -34,14 +34,14 @@ func (b *MockBackend) GetTopic(topic string) []substrate.Message {
 }
 
 // SetTopic sets messages to be consumed for a given topic.
-func (b *MockBackend) SetTopic(topic string, messages []substrate.Message) {
+func (b *Backend) SetTopic(topic string, messages []substrate.Message) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
 	b.messages[topic] = messages
 }
 
-func (b *MockBackend) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+func (b *Backend) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	return &mockSource{
 		backend: b,
 		config:  req,
@@ -49,7 +49,7 @@ func (b *MockBackend) NewAsyncSource(ctx context.Context, req *proto.StartConsum
 }
 
 type mockSource struct {
-	backend *MockBackend
+	backend *Backend
 	config  *proto.StartConsumeRequest
 }
 
@@ -115,7 +115,7 @@ func (source *mockSource) Status() (*substrate.Status, error) {
 	panic("not implemented")
 }
 
-func (b *MockBackend) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
+func (b *Backend) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return &mockSink{
 		backend: b,
 		config:  req,
@@ -123,7 +123,7 @@ func (b *MockBackend) NewAsyncSink(ctx context.Context, req *proto.StartPublishR
 }
 
 type mockSink struct {
-	backend *MockBackend
+	backend *Backend
 	config  *proto.StartPublishRequest
 }
 

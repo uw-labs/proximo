@@ -1,4 +1,4 @@
-package main
+package natsstreaming
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/uw-labs/substrate/natsstreaming"
 )
 
-type NATSStreamingAsyncSourceFactory struct {
+type AsyncSourceFactory struct {
 	URL                    string
 	ClusterID              string
 	MaxInflight            int
@@ -16,7 +16,7 @@ type NATSStreamingAsyncSourceFactory struct {
 	ConnectionPingInterval int
 }
 
-func (f NATSStreamingAsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+func (f AsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	var offset int64
 	switch req.GetInitialOffset() {
 	case proto.Offset_OFFSET_OLDEST, proto.Offset_OFFSET_DEFAULT:
@@ -36,12 +36,12 @@ func (f NATSStreamingAsyncSourceFactory) NewAsyncSource(ctx context.Context, req
 	})
 }
 
-type NATSStreamingAsyncMessageFactory struct {
+type AsyncSinkFactory struct {
 	URL       string
 	ClusterID string
 }
 
-func (f NATSStreamingAsyncMessageFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
+func (f AsyncSinkFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return natsstreaming.NewAsyncMessageSink(natsstreaming.AsyncMessageSinkConfig{
 		URL:       f.URL,
 		ClusterID: f.ClusterID,

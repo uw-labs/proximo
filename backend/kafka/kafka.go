@@ -9,12 +9,12 @@ import (
 	"github.com/uw-labs/substrate/kafka"
 )
 
-type KafkaAsyncSourceFactory struct {
+type AsyncSourceFactory struct {
 	Brokers []string
 	Version *sarama.KafkaVersion
 }
 
-func (f KafkaAsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+func (f AsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	var offset int64
 	switch req.GetInitialOffset() {
 	case proto.Offset_OFFSET_OLDEST, proto.Offset_OFFSET_DEFAULT:
@@ -31,12 +31,12 @@ func (f KafkaAsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.
 	})
 }
 
-type KafkaAsyncSinkFactory struct {
+type AsyncSinkFactory struct {
 	Brokers []string
 	Version *sarama.KafkaVersion
 }
 
-func (f KafkaAsyncSinkFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
+func (f AsyncSinkFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
 		Topic:   req.GetTopic(),
 		Brokers: f.Brokers,

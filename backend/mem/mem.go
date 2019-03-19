@@ -7,7 +7,7 @@ import (
 	"github.com/uw-labs/substrate"
 )
 
-func NewMemBackend() AsyncSinkSourceFactory {
+func NewBackend() AsyncSinkSourceFactory {
 	mh := &memBackend{
 		incomingMessages: make(chan *produceReq, 1024),
 		subs:             make(chan *sub, 1024),

@@ -10,6 +10,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/uw-labs/proximo/backend/mem"
+
+	"github.com/uw-labs/proximo/backend/natsstreaming"
+
+	"github.com/uw-labs/proximo/backend/kafka"
+
 	"github.com/Shopify/sarama"
 	cli "github.com/jawher/mow.cli"
 	stan "github.com/nats-io/go-nats-streaming"
@@ -78,13 +84,13 @@ func main() {
 			}
 
 			if enabled[consumeEndpoint] {
-				sourceFactory = &KafkaAsyncSourceFactory{
+				sourceFactory = &kafka.AsyncSourceFactory{
 					Brokers: brokers,
 					Version: version,
 				}
 			}
 			if enabled[publishEndpoint] {
-				sinkFactory = &KafkaAsyncSinkFactory{
+				sinkFactory = &kafka.AsyncSinkFactory{
 					Brokers: brokers,
 					Version: version,
 				}
@@ -127,7 +133,7 @@ func main() {
 		})
 		cmd.Action = func() {
 			if enabled[consumeEndpoint] {
-				sourceFactory = NATSStreamingAsyncSourceFactory{
+				sourceFactory = natsstreaming.AsyncSourceFactory{
 					URL:                    *url,
 					ClusterID:              *cid,
 					MaxInflight:            *maxInflight,
@@ -136,7 +142,7 @@ func main() {
 				}
 			}
 			if enabled[publishEndpoint] {
-				sinkFactory = NATSStreamingAsyncMessageFactory{
+				sinkFactory = natsstreaming.AsyncSinkFactory{
 					URL:       *url,
 					ClusterID: *cid,
 				}
@@ -148,7 +154,7 @@ func main() {
 
 	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
 		cmd.Action = func() {
-			h := NewMemBackend()
+			h := mem.NewBackend()
 
 			if enabled[consumeEndpoint] {
 				sourceFactory = h
