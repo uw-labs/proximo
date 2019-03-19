@@ -9,11 +9,11 @@ import (
 )
 
 type NATSStreamingAsyncSourceFactory struct {
-	url                 string
-	clusterID           string
-	maxInflight         int
-	pingIntervalSeconds int
-	numPingTimeouts     int
+	URL                    string
+	ClusterID              string
+	MaxInflight            int
+	ConnectionNumPings     int
+	ConnectionPingInterval int
 }
 
 func (f NATSStreamingAsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
@@ -25,26 +25,26 @@ func (f NATSStreamingAsyncSourceFactory) NewAsyncSource(ctx context.Context, req
 		offset = natsstreaming.OffsetNewest
 	}
 	return natsstreaming.NewAsyncMessageSource(natsstreaming.AsyncMessageSourceConfig{
-		URL:                    f.url,
-		ClusterID:              f.clusterID,
+		URL:                    f.URL,
+		ClusterID:              f.ClusterID,
 		Subject:                req.GetTopic(),
 		QueueGroup:             req.GetConsumer(),
 		Offset:                 offset,
-		MaxInFlight:            f.maxInflight,
-		ConnectionNumPings:     f.numPingTimeouts,
-		ConnectionPingInterval: f.pingIntervalSeconds,
+		MaxInFlight:            f.MaxInflight,
+		ConnectionNumPings:     f.ConnectionNumPings,
+		ConnectionPingInterval: f.ConnectionPingInterval,
 	})
 }
 
 type NATSStreamingAsyncMessageFactory struct {
-	url       string
-	clusterID string
+	URL       string
+	ClusterID string
 }
 
 func (f NATSStreamingAsyncMessageFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return natsstreaming.NewAsyncMessageSink(natsstreaming.AsyncMessageSinkConfig{
-		URL:       f.url,
-		ClusterID: f.clusterID,
+		URL:       f.URL,
+		ClusterID: f.ClusterID,
 		Subject:   req.GetTopic(),
 	})
 }

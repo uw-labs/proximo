@@ -79,14 +79,14 @@ func main() {
 
 			if enabled[consumeEndpoint] {
 				sourceFactory = &KafkaAsyncSourceFactory{
-					brokers: brokers,
-					version: version,
+					Brokers: brokers,
+					Version: version,
 				}
 			}
 			if enabled[publishEndpoint] {
 				sinkFactory = &KafkaAsyncSinkFactory{
-					brokers: brokers,
-					version: version,
+					Brokers: brokers,
+					Version: version,
 				}
 			}
 
@@ -128,17 +128,17 @@ func main() {
 		cmd.Action = func() {
 			if enabled[consumeEndpoint] {
 				sourceFactory = NATSStreamingAsyncSourceFactory{
-					url:                 *url,
-					clusterID:           *cid,
-					maxInflight:         *maxInflight,
-					numPingTimeouts:     *pingNumTimeouts,
-					pingIntervalSeconds: *pingIntervalSeconds,
+					URL:                    *url,
+					ClusterID:              *cid,
+					MaxInflight:            *maxInflight,
+					ConnectionNumPings:     *pingNumTimeouts,
+					ConnectionPingInterval: *pingIntervalSeconds,
 				}
 			}
 			if enabled[publishEndpoint] {
 				sinkFactory = NATSStreamingAsyncMessageFactory{
-					url:       *url,
-					clusterID: *cid,
+					URL:       *url,
+					ClusterID: *cid,
 				}
 			}
 
@@ -148,7 +148,7 @@ func main() {
 
 	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
 		cmd.Action = func() {
-			h := newMemHandler()
+			h := NewMemBackend()
 
 			if enabled[consumeEndpoint] {
 				sourceFactory = h

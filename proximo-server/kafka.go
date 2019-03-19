@@ -10,8 +10,8 @@ import (
 )
 
 type KafkaAsyncSourceFactory struct {
-	brokers []string
-	version *sarama.KafkaVersion
+	Brokers []string
+	Version *sarama.KafkaVersion
 }
 
 func (f KafkaAsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
@@ -26,20 +26,20 @@ func (f KafkaAsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.
 		ConsumerGroup: req.GetConsumer(),
 		Topic:         req.GetTopic(),
 		Offset:        offset,
-		Brokers:       f.brokers,
-		Version:       f.version,
+		Brokers:       f.Brokers,
+		Version:       f.Version,
 	})
 }
 
 type KafkaAsyncSinkFactory struct {
-	brokers []string
-	version *sarama.KafkaVersion
+	Brokers []string
+	Version *sarama.KafkaVersion
 }
 
 func (f KafkaAsyncSinkFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
 		Topic:   req.GetTopic(),
-		Brokers: f.brokers,
-		Version: f.version,
+		Brokers: f.Brokers,
+		Version: f.Version,
 	})
 }

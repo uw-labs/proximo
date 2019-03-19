@@ -7,8 +7,8 @@ import (
 	"github.com/uw-labs/substrate"
 )
 
-func newMemHandler() *memHandler {
-	mh := &memHandler{
+func NewMemBackend() AsyncSinkSourceFactory {
+	mh := &memBackend{
 		incomingMessages: make(chan *produceReq, 1024),
 		subs:             make(chan *sub, 1024),
 		last100:          make(map[string][]substrate.Message),
@@ -17,21 +17,21 @@ func newMemHandler() *memHandler {
 	return mh
 }
 
-type memHandler struct {
+type memBackend struct {
 	incomingMessages chan *produceReq
 	subs             chan *sub
 
 	last100 map[string][]substrate.Message
 }
 
-func (h *memHandler) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+func (h *memBackend) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	return memSource{
 		backend: h,
 		config:  req,
 	}, nil
 }
 
-func (h *memHandler) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
+func (h *memBackend) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return memSink{
 		backend: h,
 		config:  req,
@@ -39,7 +39,7 @@ func (h *memHandler) NewAsyncSink(ctx context.Context, req *proto.StartPublishRe
 }
 
 type memSource struct {
-	backend *memHandler
+	backend *memBackend
 	config  *proto.StartConsumeRequest
 }
 
@@ -74,7 +74,7 @@ func (s memSource) Status() (*substrate.Status, error) {
 }
 
 type memSink struct {
-	backend *memHandler
+	backend *memBackend
 	config  *proto.StartPublishRequest
 }
 
@@ -132,7 +132,7 @@ func (s memSink) Status() (*substrate.Status, error) {
 	panic("not implemented")
 }
 
-func (h memHandler) loop() {
+func (h memBackend) loop() {
 	subs := make(map[string]map[string][]*sub)
 
 	for {
@@ -179,7 +179,7 @@ func (h memHandler) loop() {
 	}
 }
 
-func (h *memHandler) sendLast100(s *sub) {
+func (h *memBackend) sendLast100(s *sub) {
 	for _, m := range h.last100[s.topic] {
 		select {
 		case s.msgs <- m:
