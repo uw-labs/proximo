@@ -36,9 +36,9 @@ type KafkaAsyncSinkFactory struct {
 	version *sarama.KafkaVersion
 }
 
-func (f KafkaAsyncSinkFactory) NewAsyncSink(ctx context.Context, config SinkConfig) (substrate.AsyncMessageSink, error) {
+func (f KafkaAsyncSinkFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
-		Topic:   config.Topic,
+		Topic:   req.GetTopic(),
 		Brokers: f.brokers,
 		Version: f.version,
 	})

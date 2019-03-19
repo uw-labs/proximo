@@ -115,28 +115,28 @@ func (source *mockSource) Status() (*substrate.Status, error) {
 	panic("not implemented")
 }
 
-func (b *MockBackend) NewAsyncSink(ctx context.Context, config SinkConfig) (substrate.AsyncMessageSink, error) {
+func (b *MockBackend) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return &mockSink{
 		backend: b,
-		config:  config,
+		config:  req,
 	}, nil
 }
 
 type mockSink struct {
 	backend *MockBackend
-	config  SinkConfig
+	config  *proto.StartPublishRequest
 }
 
 func (sink *mockSink) PublishMessages(ctx context.Context, acks chan<- substrate.Message, messages <-chan substrate.Message) error {
 	sink.backend.mutex.Lock()
 	defer sink.backend.mutex.Unlock()
 
-	msgs, ok := sink.backend.messages[sink.config.Topic]
+	msgs, ok := sink.backend.messages[sink.config.GetTopic()]
 	if !ok {
 		msgs = make([]substrate.Message, 0)
 	}
 	defer func() {
-		sink.backend.messages[sink.config.Topic] = msgs
+		sink.backend.messages[sink.config.GetTopic()] = msgs
 	}()
 
 	toConfirm := make([]substrate.Message, 0)

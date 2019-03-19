@@ -31,10 +31,10 @@ func (h *memHandler) NewAsyncSource(ctx context.Context, req *proto.StartConsume
 	}, nil
 }
 
-func (h *memHandler) NewAsyncSink(ctx context.Context, config SinkConfig) (substrate.AsyncMessageSink, error) {
+func (h *memHandler) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return memSink{
 		backend: h,
-		config:  config,
+		config:  req,
 	}, nil
 }
 
@@ -75,7 +75,7 @@ func (s memSource) Status() (*substrate.Status, error) {
 
 type memSink struct {
 	backend *memHandler
-	config  SinkConfig
+	config  *proto.StartPublishRequest
 }
 
 func (s memSink) PublishMessages(ctx context.Context, acks chan<- substrate.Message, messages <-chan substrate.Message) error {
@@ -88,7 +88,7 @@ func (s memSink) PublishMessages(ctx context.Context, acks chan<- substrate.Mess
 			return nil
 		case msg := <-messages:
 			select {
-			case s.backend.incomingMessages <- &produceReq{topic: s.config.Topic, message: msg}:
+			case s.backend.incomingMessages <- &produceReq{topic: s.config.GetTopic(), message: msg}:
 				select {
 				case acks <- msg:
 				case <-ctx.Done():
