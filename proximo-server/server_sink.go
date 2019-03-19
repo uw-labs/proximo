@@ -104,7 +104,7 @@ func (s *SinkServer) receiveMessages(ctx context.Context, stream receiveSinkStre
 				return errNotConnected
 			}
 			select {
-			case messages <- proximoMsg{msg: msg.GetMsg()}:
+			case messages <- &proximoMsg{msg: msg.GetMsg()}:
 			case <-ctx.Done():
 				return nil
 			}
@@ -124,7 +124,7 @@ func (s *SinkServer) sendConfirmations(ctx context.Context, stream sendSinkStrea
 	for {
 		select {
 		case msg := <-forClient:
-			pMsg, ok := msg.(proximoMsg)
+			pMsg, ok := msg.(*proximoMsg)
 			if !ok {
 				return errors.Errorf("unexpected message: %v", pMsg)
 			}
@@ -141,6 +141,6 @@ type proximoMsg struct {
 	msg *proto.Message
 }
 
-func (m proximoMsg) Data() []byte {
+func (m *proximoMsg) Data() []byte {
 	return m.msg.Data
 }

@@ -11,7 +11,7 @@ func newMemHandler() *memHandler {
 	mh := &memHandler{
 		incomingMessages: make(chan *produceReq, 1024),
 		subs:             make(chan *sub, 1024),
-		last100:          make(map[string][]*proto.Message),
+		last100:          make(map[string][]substrate.Message),
 	}
 	go mh.loop()
 	return mh
@@ -21,7 +21,14 @@ type memHandler struct {
 	incomingMessages chan *produceReq
 	subs             chan *sub
 
-	last100 map[string][]*proto.Message
+	last100 map[string][]substrate.Message
+}
+
+func (h *memHandler) NewAsyncSource(ctx context.Context, config consumerConfig) (substrate.AsyncMessageSource, error) {
+	return memSource{
+		backend: h,
+		config:  config,
+	}, nil
 }
 
 func (h *memHandler) NewAsyncSink(ctx context.Context, config SinkConfig) (substrate.AsyncMessageSink, error) {
@@ -31,20 +38,39 @@ func (h *memHandler) NewAsyncSink(ctx context.Context, config SinkConfig) (subst
 	}, nil
 }
 
-func (h *memHandler) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
+type memSource struct {
+	backend *memHandler
+	config  consumerConfig
+}
+
+func (s memSource) ConsumeMessages(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	h.subs <- &sub{conf.topic, conf.consumer, forClient, ctx}
+	s.backend.subs <- &sub{
+		topic:    s.config.topic,
+		consumer: s.config.consumer,
+		offset:   s.config.offset,
+		msgs:     messages,
+		ctx:      ctx,
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-confirmRequest:
+		case <-acks:
 			// drop
 		}
 	}
+}
+
+func (s memSource) Close() error {
+	return nil
+}
+
+func (s memSource) Status() (*substrate.Status, error) {
+	panic("not implemented")
 }
 
 type memSink struct {
@@ -121,8 +147,8 @@ func (h memHandler) loop() {
 			forThisConsumer = append(forThisConsumer, s)
 			all[s.consumer] = forThisConsumer
 
-			for _, m := range h.last100[s.topic] {
-				s.msgs <- m
+			if s.offset != proto.Offset_OFFSET_NEWEST {
+				h.sendLast100(s)
 			}
 
 		case inm := <-h.incomingMessages:
@@ -135,7 +161,7 @@ func (h memHandler) loop() {
 						select {
 						case <-sub.ctx.Done():
 							// drop expired consumers
-						case sub.msgs <- &proto.Message{Data: inm.message.Data(), Id: generateID()}:
+						case sub.msgs <- inm.message:
 							remaining = append(remaining, sub)
 							sentOne = true
 						}
@@ -145,10 +171,20 @@ func (h memHandler) loop() {
 				}
 			}
 
-			h.last100[inm.topic] = append(h.last100[inm.topic], &proto.Message{Data: inm.message.Data(), Id: generateID()})
+			h.last100[inm.topic] = append(h.last100[inm.topic], inm.message)
 			for len(h.last100[inm.topic]) > 100 {
 				h.last100[inm.topic] = h.last100[inm.topic][1:]
 			}
+		}
+	}
+}
+
+func (h *memHandler) sendLast100(s *sub) {
+	for _, m := range h.last100[s.topic] {
+		select {
+		case s.msgs <- m:
+		case <-s.ctx.Done():
+			return
 		}
 	}
 }
@@ -161,6 +197,7 @@ type produceReq struct {
 type sub struct {
 	topic    string
 	consumer string
-	msgs     chan<- *proto.Message
+	offset   proto.Offset
+	msgs     chan<- substrate.Message
 	ctx      context.Context
 }

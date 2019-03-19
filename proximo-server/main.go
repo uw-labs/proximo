@@ -27,9 +27,9 @@ const (
 
 func main() {
 	var (
-		cHandler    consumeHandler
-		sinkFactory AsyncSinkFactory
-		enabled     map[string]bool
+		sourceFactory AsyncSourceFactory
+		sinkFactory   AsyncSinkFactory
+		enabled       map[string]bool
 	)
 
 	app := cli.App("proximo", "GRPC Proxy gateway for message queue systems")
@@ -78,7 +78,7 @@ func main() {
 			}
 
 			if enabled[consumeEndpoint] {
-				cHandler = &kafkaConsumeHandler{
+				sourceFactory = &KafkaAsyncSourceFactory{
 					brokers: brokers,
 					version: version,
 				}
@@ -127,12 +127,13 @@ func main() {
 		})
 		cmd.Action = func() {
 			if enabled[consumeEndpoint] {
-				h, err := newNatsStreamingConsumeHandler(*url, *cid, *maxInflight, *pingIntervalSeconds, *pingNumTimeouts)
-				if err != nil {
-					log.Fatalf("failed to connect to nats streaming for consumption: %v", err)
+				sourceFactory = NATSStreamingAsyncSourceFactory{
+					url:                 *url,
+					clusterID:           *cid,
+					maxInflight:         *maxInflight,
+					numPingTimeouts:     *pingNumTimeouts,
+					pingIntervalSeconds: *pingIntervalSeconds,
 				}
-				cHandler = h
-				defer h.Close()
 			}
 			if enabled[publishEndpoint] {
 				sinkFactory = NATSStreamingAsyncMessageFactory{
@@ -150,7 +151,7 @@ func main() {
 			h := newMemHandler()
 
 			if enabled[consumeEndpoint] {
-				cHandler = h
+				sourceFactory = h
 			}
 			if enabled[publishEndpoint] {
 				sinkFactory = h
@@ -163,7 +164,7 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
-	log.Fatal(listenAndServe(cHandler, sinkFactory, *port))
+	log.Fatal(listenAndServe(sourceFactory, sinkFactory, *port))
 }
 
 func parseEndpoints(endpoints string) map[string]bool {
@@ -181,7 +182,7 @@ func parseEndpoints(endpoints string) map[string]bool {
 
 	return enabled
 }
-func listenAndServe(cHandler consumeHandler, sinkFactory AsyncSinkFactory, port int) error {
+func listenAndServe(sourceFactory AsyncSourceFactory, sinkFactory AsyncSinkFactory, port int) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return errors.Wrap(err, "failed to listen")
@@ -196,8 +197,8 @@ func listenAndServe(cHandler consumeHandler, sinkFactory AsyncSinkFactory, port 
 	grpcServer := grpc.NewServer(opts...)
 	defer grpcServer.Stop()
 
-	if cHandler != nil {
-		proto.RegisterMessageSourceServer(grpcServer, &consumeServer{handler: cHandler})
+	if sourceFactory != nil {
+		proto.RegisterMessageSourceServer(grpcServer, &SourceServer{sourceFactory: sourceFactory})
 	}
 	if sinkFactory != nil {
 		proto.RegisterMessageSinkServer(grpcServer, &SinkServer{sinkFactory: sinkFactory})

@@ -7,8 +7,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/pkg/errors"
-	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
 )
 
@@ -16,18 +14,18 @@ import (
 // allows user to set the messages to be consumed or check the messages that were produced.
 type MockBackend struct {
 	mutex    sync.Mutex
-	messages map[string][]*proto.Message
+	messages map[string][]substrate.Message
 }
 
 // NewMockBackend returns a new instance of the mock backend.
 func NewMockBackend() *MockBackend {
 	return &MockBackend{
-		messages: make(map[string][]*proto.Message),
+		messages: make(map[string][]substrate.Message),
 	}
 }
 
 // GetTopic returns all messages published to a given topic.
-func (b *MockBackend) GetTopic(topic string) []*proto.Message {
+func (b *MockBackend) GetTopic(topic string) []substrate.Message {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -35,30 +33,42 @@ func (b *MockBackend) GetTopic(topic string) []*proto.Message {
 }
 
 // SetTopic sets messages to be consumed for a given topic.
-func (b *MockBackend) SetTopic(topic string, messages []*proto.Message) {
+func (b *MockBackend) SetTopic(topic string, messages []substrate.Message) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
 	b.messages[topic] = messages
 }
 
-func (b *MockBackend) HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+func (b *MockBackend) NewAsyncSource(ctx context.Context, config consumerConfig) (substrate.AsyncMessageSource, error) {
+	return &mockSource{
+		backend: b,
+		config:  config,
+	}, nil
+}
 
-	messages, ok := b.messages[conf.topic]
-	if !ok || len(messages) == 0 {
+type mockSource struct {
+	backend *MockBackend
+	config  consumerConfig
+}
+
+func (source *mockSource) ConsumeMessages(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
+	source.backend.mutex.Lock()
+	defer source.backend.mutex.Unlock()
+
+	msgs, ok := source.backend.messages[source.config.topic]
+	if !ok || len(msgs) == 0 {
 		return nil
 	}
 
 	msgIndex := 0
 	toAckIdx := 0
 
-	processConfirm := func(confirm *proto.Confirmation) error {
+	processAck := func(ack substrate.Message) error {
 		if toAckIdx == msgIndex {
 			return status.Error(codes.InvalidArgument, "no acknowledgement expected")
 		}
-		if messages[toAckIdx].Id != confirm.MsgID {
+		if msgs[toAckIdx] != ack {
 			return status.Error(codes.InvalidArgument, "wrong acknowledgement")
 		}
 		toAckIdx++
@@ -66,17 +76,17 @@ func (b *MockBackend) HandleConsume(ctx context.Context, conf consumerConfig, fo
 	}
 
 	for {
-		if msgIndex < len(messages) {
+		if msgIndex < len(msgs) {
 			select {
 			case <-ctx.Done():
 				return nil
-			case forClient <- messages[msgIndex]:
+			case messages <- msgs[msgIndex]:
 				msgIndex++
-			case confirm := <-confirmRequest:
-				if err := processConfirm(confirm); err != nil {
+			case ack := <-acks:
+				if err := processAck(ack); err != nil {
 					return err
 				}
-				if toAckIdx == len(messages) {
+				if toAckIdx == len(msgs) {
 					return nil
 				}
 			}
@@ -84,16 +94,24 @@ func (b *MockBackend) HandleConsume(ctx context.Context, conf consumerConfig, fo
 			select {
 			case <-ctx.Done():
 				return nil
-			case confirm := <-confirmRequest:
-				if err := processConfirm(confirm); err != nil {
+			case ack := <-acks:
+				if err := processAck(ack); err != nil {
 					return err
 				}
-				if toAckIdx == len(messages) {
+				if toAckIdx == len(msgs) {
 					return nil
 				}
 			}
 		}
 	}
+}
+
+func (source *mockSource) Close() error {
+	return nil
+}
+
+func (source *mockSource) Status() (*substrate.Status, error) {
+	panic("not implemented")
 }
 
 func (b *MockBackend) NewAsyncSink(ctx context.Context, config SinkConfig) (substrate.AsyncMessageSink, error) {
@@ -114,7 +132,7 @@ func (sink *mockSink) PublishMessages(ctx context.Context, acks chan<- substrate
 
 	msgs, ok := sink.backend.messages[sink.config.Topic]
 	if !ok {
-		msgs = make([]*proto.Message, 0)
+		msgs = make([]substrate.Message, 0)
 	}
 	defer func() {
 		sink.backend.messages[sink.config.Topic] = msgs
@@ -127,11 +145,7 @@ func (sink *mockSink) PublishMessages(ctx context.Context, acks chan<- substrate
 			case <-ctx.Done():
 				return nil
 			case msg := <-messages:
-				pMsg, ok := msg.(proximoMsg)
-				if !ok {
-					return errors.Errorf("unexpected message: %v", msg)
-				}
-				msgs = append(msgs, pMsg.msg)
+				msgs = append(msgs, msg)
 				toConfirm = append(toConfirm, msg)
 			}
 		} else {
@@ -139,11 +153,7 @@ func (sink *mockSink) PublishMessages(ctx context.Context, acks chan<- substrate
 			case <-ctx.Done():
 				return nil
 			case msg := <-messages:
-				pMsg, ok := msg.(proximoMsg)
-				if !ok {
-					return errors.Errorf("unexpected message: %v", msg)
-				}
-				msgs = append(msgs, pMsg.msg)
+				msgs = append(msgs, msg)
 				toConfirm = append(toConfirm, msg)
 			case acks <- toConfirm[0]:
 				toConfirm = toConfirm[1:]

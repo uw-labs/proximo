@@ -11,12 +11,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/proximo/proximoc-go"
+	"github.com/uw-labs/substrate"
 )
 
 var (
@@ -39,7 +39,7 @@ func Setup() error {
 
 	backend = NewMockBackend()
 
-	proto.RegisterMessageSourceServer(grpcServer, &consumeServer{handler: backend})
+	proto.RegisterMessageSourceServer(grpcServer, &SourceServer{sourceFactory: backend})
 	proto.RegisterMessageSinkServer(grpcServer, &SinkServer{sinkFactory: backend})
 	go func() { grpcServer.Serve(lis) }()
 
@@ -88,24 +88,27 @@ func TestProduceServer_Publish(t *testing.T) {
 	published := backend.GetTopic("publish-test")
 	assert.Equal(len(toPublish), len(published))
 	for i, msg := range toPublish {
-		assert.Equal(msg, published[i].Data)
+		assert.Equal(msg, published[i].Data())
 	}
 }
 
 func TestConsumeServer_Consume(t *testing.T) {
 	assert := require.New(t)
-	expected := []*proto.Message{
-		{
-			Id:   uuid.Must(uuid.NewV4()).String(),
-			Data: []byte("consume-message-1"),
+	expected := []substrate.Message{
+		&proximoMsg{
+			msg: &proto.Message{
+				Data: []byte("consume-message-1"),
+			},
 		},
-		{
-			Id:   uuid.Must(uuid.NewV4()).String(),
-			Data: []byte("consume-message-2"),
+		&proximoMsg{
+			msg: &proto.Message{
+				Data: []byte("consume-message-2"),
+			},
 		},
-		{
-			Id:   uuid.Must(uuid.NewV4()).String(),
-			Data: []byte("consume-message-3"),
+		&proximoMsg{
+			msg: &proto.Message{
+				Data: []byte("consume-message-3"),
+			},
 		},
 	}
 	backend.SetTopic("consume-test", expected)
@@ -122,7 +125,6 @@ func TestConsumeServer_Consume(t *testing.T) {
 	assert.Equal(len(expected), len(consumed))
 
 	for i, msg := range expected {
-		assert.Equal(msg.Id, consumed[i].Id)
-		assert.Equal(msg.Data, consumed[i].Data)
+		assert.Equal(msg.Data(), consumed[i].Data)
 	}
 }

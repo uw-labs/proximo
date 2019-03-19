@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/uw-labs/proximo/proto"
+	"github.com/uw-labs/substrate"
 	"github.com/uw-labs/sync/gogroup"
 )
 
@@ -25,28 +26,34 @@ type consumerConfig struct {
 	offset   proto.Offset
 }
 
-type consumeHandler interface {
-	HandleConsume(ctx context.Context, conf consumerConfig, forClient chan<- *proto.Message, confirmRequest <-chan *proto.Confirmation) error
+type AsyncSourceFactory interface {
+	NewAsyncSource(ctx context.Context, conf consumerConfig) (substrate.AsyncMessageSource, error)
 }
 
-type consumeServer struct {
-	handler consumeHandler
+type SourceServer struct {
+	sourceFactory AsyncSourceFactory
 }
 
-func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error {
+func (s *SourceServer) Consume(stream proto.MessageSource_ConsumeServer) error {
 	sCtx := stream.Context()
 
 	g, ctx := gogroup.New(sCtx)
 
-	forClient := make(chan *proto.Message)
-	confirmRequest := make(chan *proto.Confirmation)
+	confirmations := make(chan string)
 	startRequest := make(chan *proto.StartConsumeRequest)
 
+	toAck := make(chan *ackMsg)
+	acks := make(chan substrate.Message)
+	messages := make(chan substrate.Message)
+
 	g.Go(func() error {
-		return s.receiveConfirmations(ctx, stream, startRequest, confirmRequest)
+		return s.receiveConfirmations(ctx, stream, startRequest, confirmations)
 	})
 	g.Go(func() error {
-		return s.sendMessages(ctx, stream, forClient)
+		return s.handleAcks(ctx, confirmations, acks, toAck)
+	})
+	g.Go(func() error {
+		return s.sendMessages(ctx, stream, messages, toAck)
 	})
 	g.Go(func() error {
 		var conf consumerConfig
@@ -59,7 +66,13 @@ func (s *consumeServer) Consume(stream proto.MessageSource_ConsumeServer) error 
 			return nil
 		}
 
-		return s.handler.HandleConsume(ctx, conf, forClient, confirmRequest)
+		source, err := s.sourceFactory.NewAsyncSource(ctx, conf)
+		if err != nil {
+			return err
+		}
+		defer source.Close()
+
+		return source.ConsumeMessages(ctx, messages, acks)
 	})
 
 	if err := g.Wait(); err != nil {
@@ -78,7 +91,7 @@ type receiveSourceStream interface {
 }
 
 // receiveConfirmations receives confirmations from the client
-func (s *consumeServer) receiveConfirmations(ctx context.Context, stream receiveSourceStream, startRequest chan<- *proto.StartConsumeRequest, confirmRequest chan<- *proto.Confirmation) error {
+func (s *SourceServer) receiveConfirmations(ctx context.Context, stream receiveSourceStream, startRequest chan<- *proto.StartConsumeRequest, confirmations chan<- string) error {
 	started := false
 	for {
 		msg, err := stream.Recv()
@@ -107,7 +120,7 @@ func (s *consumeServer) receiveConfirmations(ctx context.Context, stream receive
 				return errInvalidConfirm
 			}
 			select {
-			case confirmRequest <- msg.GetConfirmation():
+			case confirmations <- msg.GetConfirmation().GetMsgID():
 			case <-ctx.Done():
 				return nil
 			}
@@ -123,19 +136,71 @@ type sendSourceStream interface {
 }
 
 // sendMessages sends messages to the client
-func (s *consumeServer) sendMessages(ctx context.Context, stream sendSourceStream, forClient <-chan *proto.Message) error {
+func (s *SourceServer) sendMessages(ctx context.Context, stream sendSourceStream, messages <-chan substrate.Message, toAck chan<- *ackMsg) error {
 	for {
 		select {
-		case m := <-forClient:
-			err := stream.Send(m)
+		case <-ctx.Done():
+			return nil
+		case msg := <-messages:
+			aMsg := &ackMsg{
+				id:  generateID(),
+				msg: msg,
+			}
+			pMsg := &proto.Message{
+				Id: aMsg.id,
+				// Read the data now so that we can safely discard the payload
+				// once the message is passed to the ack handler.
+				Data: msg.Data(),
+			}
+			select {
+			case <-ctx.Done():
+				return nil
+			case toAck <- aMsg:
+			}
+			err := stream.Send(pMsg)
 			if err != nil {
 				if strings.HasSuffix(err.Error(), "context canceled") {
 					return nil
 				}
 				return err
 			}
-		case <-ctx.Done():
-			return nil
 		}
 	}
+}
+
+func (s *SourceServer) handleAcks(ctx context.Context, confirmations <-chan string, acks chan<- substrate.Message, toAck <-chan *ackMsg) error {
+	ackMap := make(map[string]substrate.Message)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case ackMsg := <-toAck:
+			if dMsg, ok := ackMsg.msg.(substrate.DiscardableMessage); ok {
+				dMsg.DiscardPayload() // Discard payload to save space
+			}
+			ackMap[ackMsg.id] = ackMsg.msg
+		case msgID := <-confirmations:
+			sMsg, ok := ackMap[msgID]
+			if !ok {
+				return status.Errorf(codes.InvalidArgument, "no message to confirm with id: %s", msgID)
+			}
+
+			// Substrate backend should always be ready to accept
+			// an acknowledgement, so this shouldn't block
+			select {
+			case <-ctx.Done():
+				return nil
+			case acks <- sMsg:
+			}
+
+			delete(ackMap, msgID)
+		}
+	}
+}
+
+// ackMsg is a mapping from substrate message to proximo message id
+type ackMsg struct {
+	id  string
+	msg substrate.Message
 }
