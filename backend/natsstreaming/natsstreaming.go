@@ -2,6 +2,7 @@ package natsstreaming
 
 import (
 	"context"
+	"time"
 
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
@@ -10,7 +11,9 @@ import (
 
 type AsyncSourceFactory struct {
 	URL                    string
+	ClientID               string
 	ClusterID              string
+	AckWait                time.Duration
 	MaxInflight            int
 	ConnectionNumPings     int
 	ConnectionPingInterval int
@@ -26,10 +29,12 @@ func (f AsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.Start
 	}
 	return natsstreaming.NewAsyncMessageSource(natsstreaming.AsyncMessageSourceConfig{
 		URL:                    f.URL,
+		ClientID:               f.ClientID,
 		ClusterID:              f.ClusterID,
 		Subject:                req.GetTopic(),
 		QueueGroup:             req.GetConsumer(),
 		Offset:                 offset,
+		AckWait:                f.AckWait,
 		MaxInFlight:            f.MaxInflight,
 		ConnectionNumPings:     f.ConnectionNumPings,
 		ConnectionPingInterval: f.ConnectionPingInterval,
@@ -38,12 +43,14 @@ func (f AsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.Start
 
 type AsyncSinkFactory struct {
 	URL       string
+	ClientID  string
 	ClusterID string
 }
 
 func (f AsyncSinkFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	return natsstreaming.NewAsyncMessageSink(natsstreaming.AsyncMessageSinkConfig{
 		URL:       f.URL,
+		ClientID:  f.ClientID,
 		ClusterID: f.ClusterID,
 		Subject:   req.GetTopic(),
 	})
