@@ -24,10 +24,10 @@ type memHandler struct {
 	last100 map[string][]substrate.Message
 }
 
-func (h *memHandler) NewAsyncSource(ctx context.Context, config consumerConfig) (substrate.AsyncMessageSource, error) {
+func (h *memHandler) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	return memSource{
 		backend: h,
-		config:  config,
+		config:  req,
 	}, nil
 }
 
@@ -40,7 +40,7 @@ func (h *memHandler) NewAsyncSink(ctx context.Context, config SinkConfig) (subst
 
 type memSource struct {
 	backend *memHandler
-	config  consumerConfig
+	config  *proto.StartConsumeRequest
 }
 
 func (s memSource) ConsumeMessages(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
@@ -48,9 +48,9 @@ func (s memSource) ConsumeMessages(ctx context.Context, messages chan<- substrat
 	defer cancel()
 
 	s.backend.subs <- &sub{
-		topic:    s.config.topic,
-		consumer: s.config.consumer,
-		offset:   s.config.offset,
+		topic:    s.config.GetTopic(),
+		consumer: s.config.GetConsumer(),
+		offset:   s.config.GetInitialOffset(),
 		msgs:     messages,
 		ctx:      ctx,
 	}

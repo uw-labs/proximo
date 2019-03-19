@@ -16,9 +16,9 @@ type NATSStreamingAsyncSourceFactory struct {
 	numPingTimeouts     int
 }
 
-func (f NATSStreamingAsyncSourceFactory) NewAsyncSource(ctx context.Context, conf consumerConfig) (substrate.AsyncMessageSource, error) {
+func (f NATSStreamingAsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	var offset int64
-	switch conf.offset {
+	switch req.GetInitialOffset() {
 	case proto.Offset_OFFSET_OLDEST, proto.Offset_OFFSET_DEFAULT:
 		offset = natsstreaming.OffsetOldest
 	case proto.Offset_OFFSET_NEWEST:
@@ -27,8 +27,8 @@ func (f NATSStreamingAsyncSourceFactory) NewAsyncSource(ctx context.Context, con
 	return natsstreaming.NewAsyncMessageSource(natsstreaming.AsyncMessageSourceConfig{
 		URL:                    f.url,
 		ClusterID:              f.clusterID,
-		Subject:                conf.topic,
-		QueueGroup:             conf.consumer,
+		Subject:                req.GetTopic(),
+		QueueGroup:             req.GetConsumer(),
 		Offset:                 offset,
 		MaxInFlight:            f.maxInflight,
 		ConnectionNumPings:     f.numPingTimeouts,
@@ -45,7 +45,6 @@ func (f NATSStreamingAsyncMessageFactory) NewAsyncSink(ctx context.Context, conf
 	return natsstreaming.NewAsyncMessageSink(natsstreaming.AsyncMessageSinkConfig{
 		URL:       f.url,
 		ClusterID: f.clusterID,
-		ClientID:  "proximo" + generateID(),
 		Subject:   config.Topic,
 	})
 }

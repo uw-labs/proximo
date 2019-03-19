@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
 )
 
@@ -40,23 +41,23 @@ func (b *MockBackend) SetTopic(topic string, messages []substrate.Message) {
 	b.messages[topic] = messages
 }
 
-func (b *MockBackend) NewAsyncSource(ctx context.Context, config consumerConfig) (substrate.AsyncMessageSource, error) {
+func (b *MockBackend) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	return &mockSource{
 		backend: b,
-		config:  config,
+		config:  req,
 	}, nil
 }
 
 type mockSource struct {
 	backend *MockBackend
-	config  consumerConfig
+	config  *proto.StartConsumeRequest
 }
 
 func (source *mockSource) ConsumeMessages(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
 	source.backend.mutex.Lock()
 	defer source.backend.mutex.Unlock()
 
-	msgs, ok := source.backend.messages[source.config.topic]
+	msgs, ok := source.backend.messages[source.config.GetTopic()]
 	if !ok || len(msgs) == 0 {
 		return nil
 	}

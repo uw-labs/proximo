@@ -14,17 +14,17 @@ type KafkaAsyncSourceFactory struct {
 	version *sarama.KafkaVersion
 }
 
-func (f KafkaAsyncSourceFactory) NewAsyncSource(ctx context.Context, conf consumerConfig) (substrate.AsyncMessageSource, error) {
+func (f KafkaAsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	var offset int64
-	switch conf.offset {
+	switch req.GetInitialOffset() {
 	case proto.Offset_OFFSET_OLDEST, proto.Offset_OFFSET_DEFAULT:
 		offset = kafka.OffsetOldest
 	case proto.Offset_OFFSET_NEWEST:
 		offset = kafka.OffsetNewest
 	}
 	return kafka.NewAsyncMessageSource(kafka.AsyncMessageSourceConfig{
-		ConsumerGroup: conf.consumer,
-		Topic:         conf.topic,
+		ConsumerGroup: req.GetConsumer(),
+		Topic:         req.GetTopic(),
 		Offset:        offset,
 		Brokers:       f.brokers,
 		Version:       f.version,

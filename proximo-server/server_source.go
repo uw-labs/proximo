@@ -20,14 +20,8 @@ var (
 	errInvalidRequest = status.Error(codes.InvalidArgument, "invalid consumer request - this is possibly a bug in your client library")
 )
 
-type consumerConfig struct {
-	consumer string
-	topic    string
-	offset   proto.Offset
-}
-
 type AsyncSourceFactory interface {
-	NewAsyncSource(ctx context.Context, conf consumerConfig) (substrate.AsyncMessageSource, error)
+	NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error)
 }
 
 type SourceServer struct {
@@ -56,17 +50,14 @@ func (s *SourceServer) Consume(stream proto.MessageSource_ConsumeServer) error {
 		return s.sendMessages(ctx, stream, messages, toAck)
 	})
 	g.Go(func() error {
-		var conf consumerConfig
+		var req *proto.StartConsumeRequest
 		select {
-		case sr := <-startRequest:
-			conf.topic = sr.GetTopic()
-			conf.consumer = sr.GetConsumer()
-			conf.offset = sr.GetInitialOffset()
+		case req = <-startRequest:
 		case <-ctx.Done():
 			return nil
 		}
 
-		source, err := s.sourceFactory.NewAsyncSource(ctx, conf)
+		source, err := s.sourceFactory.NewAsyncSource(ctx, req)
 		if err != nil {
 			return err
 		}
