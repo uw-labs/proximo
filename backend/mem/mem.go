@@ -3,11 +3,12 @@ package mem
 import (
 	"context"
 
+	"github.com/uw-labs/proximo"
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
 )
 
-func NewBackend() AsyncSinkSourceFactory {
+func NewBackend() proximo.AsyncSinkSourceFactory {
 	mh := &memBackend{
 		incomingMessages: make(chan *produceReq, 1024),
 		subs:             make(chan *sub, 1024),

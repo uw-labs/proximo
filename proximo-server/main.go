@@ -10,12 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/uw-labs/proximo/backend/mem"
-
-	"github.com/uw-labs/proximo/backend/natsstreaming"
-
-	"github.com/uw-labs/proximo/backend/kafka"
-
 	"github.com/Shopify/sarama"
 	cli "github.com/jawher/mow.cli"
 	stan "github.com/nats-io/go-nats-streaming"
@@ -23,6 +17,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
+	"github.com/uw-labs/proximo"
+	"github.com/uw-labs/proximo/backend/kafka"
+	"github.com/uw-labs/proximo/backend/mem"
+	"github.com/uw-labs/proximo/backend/natsstreaming"
 	"github.com/uw-labs/proximo/proto"
 )
 
@@ -33,8 +31,8 @@ const (
 
 func main() {
 	var (
-		sourceFactory AsyncSourceFactory
-		sinkFactory   AsyncSinkFactory
+		sourceFactory proximo.AsyncSourceFactory
+		sinkFactory   proximo.AsyncSinkFactory
 		enabled       map[string]bool
 	)
 
@@ -188,7 +186,7 @@ func parseEndpoints(endpoints string) map[string]bool {
 
 	return enabled
 }
-func listenAndServe(sourceFactory AsyncSourceFactory, sinkFactory AsyncSinkFactory, port int) error {
+func listenAndServe(sourceFactory proximo.AsyncSourceFactory, sinkFactory proximo.AsyncSinkFactory, port int) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return errors.Wrap(err, "failed to listen")
@@ -204,10 +202,10 @@ func listenAndServe(sourceFactory AsyncSourceFactory, sinkFactory AsyncSinkFacto
 	defer grpcServer.Stop()
 
 	if sourceFactory != nil {
-		proto.RegisterMessageSourceServer(grpcServer, &SourceServer{SourceFactory: sourceFactory})
+		proto.RegisterMessageSourceServer(grpcServer, &proximo.SourceServer{SourceFactory: sourceFactory})
 	}
 	if sinkFactory != nil {
-		proto.RegisterMessageSinkServer(grpcServer, &SinkServer{SinkFactory: sinkFactory})
+		proto.RegisterMessageSinkServer(grpcServer, &proximo.SinkServer{SinkFactory: sinkFactory})
 	}
 
 	errCh := make(chan error, 1)
