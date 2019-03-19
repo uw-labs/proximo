@@ -15,7 +15,7 @@ import (
 )
 
 type SinkServer struct {
-	sinkFactory AsyncSinkFactory
+	SinkFactory AsyncSinkFactory
 }
 
 func (s *SinkServer) Publish(stream proto.MessageSink_PublishServer) error {
@@ -41,7 +41,7 @@ func (s *SinkServer) Publish(stream proto.MessageSink_PublishServer) error {
 			return nil
 		}
 
-		sink, err := s.sinkFactory.NewAsyncSink(ctx, req)
+		sink, err := s.SinkFactory.NewAsyncSink(ctx, req)
 		if err != nil {
 			return err
 		}

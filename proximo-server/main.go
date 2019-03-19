@@ -204,10 +204,10 @@ func listenAndServe(sourceFactory AsyncSourceFactory, sinkFactory AsyncSinkFacto
 	defer grpcServer.Stop()
 
 	if sourceFactory != nil {
-		proto.RegisterMessageSourceServer(grpcServer, &SourceServer{sourceFactory: sourceFactory})
+		proto.RegisterMessageSourceServer(grpcServer, &SourceServer{SourceFactory: sourceFactory})
 	}
 	if sinkFactory != nil {
-		proto.RegisterMessageSinkServer(grpcServer, &SinkServer{sinkFactory: sinkFactory})
+		proto.RegisterMessageSinkServer(grpcServer, &SinkServer{SinkFactory: sinkFactory})
 	}
 
 	errCh := make(chan error, 1)

@@ -14,13 +14,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
+	"github.com/uw-labs/proximo/backend/mock"
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/proximo/proximoc-go"
 	"github.com/uw-labs/substrate"
 )
 
 var (
-	backend    *MockBackend
+	backend    *mock.Backend
 	grpcServer *grpc.Server
 )
 
@@ -37,10 +38,10 @@ func Setup() error {
 	}
 	grpcServer = grpc.NewServer(opts...)
 
-	backend = NewMockBackend()
+	backend = mock.NewBackend()
 
-	proto.RegisterMessageSourceServer(grpcServer, &SourceServer{sourceFactory: backend})
-	proto.RegisterMessageSinkServer(grpcServer, &SinkServer{sinkFactory: backend})
+	proto.RegisterMessageSourceServer(grpcServer, &SourceServer{SourceFactory: backend})
+	proto.RegisterMessageSinkServer(grpcServer, &SinkServer{SinkFactory: backend})
 	go func() { grpcServer.Serve(lis) }()
 
 	// Wait for server to start

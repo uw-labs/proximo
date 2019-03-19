@@ -21,7 +21,7 @@ var (
 )
 
 type SourceServer struct {
-	sourceFactory AsyncSourceFactory
+	SourceFactory AsyncSourceFactory
 }
 
 func (s *SourceServer) Consume(stream proto.MessageSource_ConsumeServer) error {
@@ -53,7 +53,7 @@ func (s *SourceServer) Consume(stream proto.MessageSource_ConsumeServer) error {
 			return nil
 		}
 
-		source, err := s.sourceFactory.NewAsyncSource(ctx, req)
+		source, err := s.SourceFactory.NewAsyncSource(ctx, req)
 		if err != nil {
 			return err
 		}
