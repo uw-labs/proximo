@@ -14,10 +14,6 @@ import (
 	"github.com/uw-labs/sync/gogroup"
 )
 
-type AsyncSinkFactory interface {
-	NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error)
-}
-
 type SinkServer struct {
 	sinkFactory AsyncSinkFactory
 }

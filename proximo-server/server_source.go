@@ -20,10 +20,6 @@ var (
 	errInvalidRequest = status.Error(codes.InvalidArgument, "invalid consumer request - this is possibly a bug in your client library")
 )
 
-type AsyncSourceFactory interface {
-	NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error)
-}
-
 type SourceServer struct {
 	sourceFactory AsyncSourceFactory
 }
