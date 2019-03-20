@@ -162,11 +162,11 @@ func (s *SourceServer) handleAcks(ctx context.Context, confirmations <-chan stri
 		select {
 		case <-ctx.Done():
 			return nil
-		case ackMsg := <-toAck:
-			if dMsg, ok := ackMsg.msg.(substrate.DiscardableMessage); ok {
+		case aMsg := <-toAck:
+			if dMsg, ok := aMsg.msg.(substrate.DiscardableMessage); ok {
 				dMsg.DiscardPayload() // Discard payload to save space
 			}
-			ackMap[ackMsg.id] = ackMsg.msg
+			ackMap[aMsg.id] = aMsg.msg
 		case msgID := <-confirmations:
 			sMsg, ok := ackMap[msgID]
 			if !ok {
