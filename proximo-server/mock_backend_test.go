@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/uw-labs/proximo/internal/proto"
+	"github.com/uw-labs/proximo/proto"
 )
 
 // MockBackend is a simple backend implementation that allows one consumer or publisher at a time and

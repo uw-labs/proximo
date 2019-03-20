@@ -12,7 +12,7 @@ import (
 	"github.com/nats-io/go-nats"
 	stan "github.com/nats-io/go-nats-streaming"
 
-	"github.com/uw-labs/proximo/internal/proto"
+	"github.com/uw-labs/proximo/proto"
 )
 
 type natsStreamingConsumeHandler struct {
