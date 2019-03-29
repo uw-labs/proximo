@@ -168,7 +168,10 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
-	log.Fatal(listenAndServe(sourceFactory, sinkFactory, *port))
+	if err := listenAndServe(sourceFactory, sinkFactory, *port); err != nil {
+		log.Fatal(err)
+	}
+	log.Println("Server terminated cleanly")
 }
 
 func parseEndpoints(endpoints string) map[string]bool {
@@ -186,6 +189,7 @@ func parseEndpoints(endpoints string) map[string]bool {
 
 	return enabled
 }
+
 func listenAndServe(sourceFactory proximo.AsyncSourceFactory, sinkFactory proximo.AsyncSinkFactory, port int) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {

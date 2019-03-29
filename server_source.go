@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/uw-labs/proximo/internal/id"
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
 	"github.com/uw-labs/sync/gogroup"
@@ -130,7 +131,7 @@ func (s *SourceServer) sendMessages(ctx context.Context, stream sendSourceStream
 			return nil
 		case msg := <-messages:
 			aMsg := &ackMsg{
-				id:  generateID(),
+				id:  id.Generate(),
 				msg: msg,
 			}
 			pMsg := &proto.Message{

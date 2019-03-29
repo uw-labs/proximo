@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/urfave/cli"
+	"github.com/uw-labs/proximo/internal/id"
 	"github.com/uw-labs/substrate"
 	"github.com/uw-labs/substrate/proximo"
 )
@@ -52,6 +53,9 @@ func main() {
 }
 
 func consume(endpoint string, topic string, consumerID string) error {
+	if consumerID == "" {
+		consumerID = id.Generate()
+	}
 	source, err := proximo.NewAsyncMessageSource(proximo.AsyncMessageSourceConfig{
 		Broker:        endpoint,
 		Topic:         topic,
@@ -106,7 +110,7 @@ func produce(endpoint string, topic string) error {
 func newContext() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		sCh := make(chan os.Signal)
+		sCh := make(chan os.Signal, 1)
 		signal.Notify(sCh, os.Interrupt, syscall.SIGTERM)
 		<-sCh
 		cancel()

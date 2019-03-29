@@ -60,8 +60,10 @@ func (h memBackend) loop() {
 
 		case inm := <-h.incomingMessages:
 			consumers := subs[inm.topic]
-			for _, consumer := range consumers {
-				var remaining []*sub
+
+			remainingConsumers := make(map[string][]*sub, len(consumers))
+			for id, consumer := range consumers {
+				var remainingSubs []*sub
 				sentOne := false
 				for _, sub := range consumer {
 					if !sentOne {
@@ -69,14 +71,16 @@ func (h memBackend) loop() {
 						case <-sub.ctx.Done():
 							// drop expired consumers
 						case sub.msgs <- inm.message:
-							remaining = append(remaining, sub)
+							remainingSubs = append(remainingSubs, sub)
 							sentOne = true
 						}
 					} else {
-						remaining = append(remaining, sub)
+						remainingSubs = append(remainingSubs, sub)
 					}
 				}
+				remainingConsumers[id] = remainingSubs
 			}
+			subs[inm.topic] = remainingConsumers
 
 			h.last100[inm.topic] = append(h.last100[inm.topic], inm.message)
 			for len(h.last100[inm.topic]) > 100 {

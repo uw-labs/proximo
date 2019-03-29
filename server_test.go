@@ -3,6 +3,7 @@ package proximo
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"testing"
@@ -42,7 +43,11 @@ func Setup() error {
 
 	proto.RegisterMessageSourceServer(grpcServer, &SourceServer{SourceFactory: backend})
 	proto.RegisterMessageSinkServer(grpcServer, &SinkServer{SinkFactory: backend})
-	go func() { grpcServer.Serve(lis) }()
+	go func() {
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Printf("gRPC server stopped with error: %s", err)
+		}
+	}()
 
 	// Wait for server to start
 	cc, err := grpc.Dial("localhost:6868", grpc.WithInsecure(), grpc.WithBlock())
