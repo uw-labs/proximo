@@ -95,8 +95,8 @@ github.com/stretchr/testify v1.2.2 h1:bSDNvY7ZPG5RlJ8otE/7V6gMiyenm9RtJ7IUVIAoJ1
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/urfave/cli v1.20.0 h1:fDqGv3UG/4jbVl/QkFwEdddtEDjh/5Ov6X+0B/3bPaw=
 github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
-github.com/uw-labs/substrate v0.0.0-20190319174501-f1f3ae6bea68 h1:b/amDlcEt5WeTjzjosKDfbiIRS1UdGQqdxX8IFzghvw=
-github.com/uw-labs/substrate v0.0.0-20190319174501-f1f3ae6bea68/go.mod h1:dyyAUJcMCwdJ5EaYf8bh2rCNvSH9wwQEIpfZwt+bOn8=
+github.com/uw-labs/substrate v0.0.0-20190329123054-36acad44151f h1:dZjrXRkei35wu5oHsJjZGJTnLLtjoYRnzEkgiv6XbL0=
+github.com/uw-labs/substrate v0.0.0-20190329123054-36acad44151f/go.mod h1:dyyAUJcMCwdJ5EaYf8bh2rCNvSH9wwQEIpfZwt+bOn8=
 github.com/uw-labs/sync v0.0.0-20190307114256-1bb306bf6e71 h1:1fL6kfRp9ebXBzK3powp5uKM3dCtK62RCiadQDqcR1Q=
 github.com/uw-labs/sync v0.0.0-20190307114256-1bb306bf6e71/go.mod h1:zTU/pesbF9d3ZN7+XwKhdE50y0SCCblmzwukXRnZkXs=
 go.etcd.io/bbolt v1.3.2 h1:Z/90sZLPOeCy2PwprqkFa25PdkusRzaj9P8zm/KNyvk=
