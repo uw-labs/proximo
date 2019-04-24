@@ -79,3 +79,45 @@ func TestConsumerErrorOnBackendDisconnect(t *testing.T) {
 	case <-success:
 	}
 }
+
+func TestProducerOnDisconnectedError(t *testing.T) {
+	logrus.StandardLogger().Out = ioutil.Discard
+
+	// seed nats with some test data
+	stanServerOpts := stand.GetDefaultOptions()
+	natsServerOpts := stand.DefaultNatsServerOptions
+	natsServerOpts.Port = 10257 // sorry!
+	natsServ, err := stand.RunServerWithOpts(stanServerOpts, &natsServerOpts)
+	require.NoError(t, err)
+	defer natsServ.Shutdown()
+
+	// set up backend handler with a proxy in the connection
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	proxy := toxiproxy.NewProxy()
+	proxy.Listen = "localhost:10258"
+	proxy.Upstream = fmt.Sprintf("localhost:%d", natsServerOpts.Port)
+	err = proxy.Start()
+	hnd, err := newNatsStreamingProduceHandler(
+		fmt.Sprintf("nats://%s", proxy.Listen), stand.DefaultClusterID, 1, 1, 3)
+	require.NoError(t, err)
+	success := make(chan struct{})
+	egrp, groupCtx := errgroup.WithContext(ctx)
+	forClient := make(chan *proto.Message)
+	acks := make(chan *proto.Confirmation)
+	egrp.Go(func() error {
+		err := hnd.HandleProduce(groupCtx, producerConfig{topic: "test"}, acks, forClient)
+		if err != nil && err != context.Canceled {
+			close(success) // our handler returned the error from the ping timeout
+		}
+		return err
+	})
+	time.AfterFunc(time.Second*1, func() {
+		proxy.Stop()
+	})
+	select {
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	case <-success:
+	}
+}

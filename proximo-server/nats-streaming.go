@@ -209,6 +209,8 @@ func (h *natsStreamingProduceHandler) HandleProduce(ctx context.Context, conf pr
 			case <-disconnected:
 				return disconnectErr
 			}
+		case <-disconnected:
+			return disconnectErr
 		}
 	}
 
