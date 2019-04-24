@@ -1,4 +1,4 @@
-FROM golang:1.11-alpine AS build
+FROM golang:1.12-alpine AS build
 RUN apk update && apk add make git gcc musl-dev
 WORKDIR /go/src/github.com/uw-labs/proximo
 ADD . /go/src/github.com/uw-labs/proximo/

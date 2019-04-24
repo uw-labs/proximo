@@ -153,17 +153,25 @@ func (h *natsStreamingConsumeHandler) HandleConsume(ctx context.Context, conf co
 }
 
 type natsStreamingProduceHandler struct {
-	clusterID   string
-	maxInflight int
-	nc          *nats.Conn
+	clusterID           string
+	maxInflight         int
+	nc                  *nats.Conn
+	pingIntervalSeconds int
+	numPingTimeouts     int
 }
 
-func newNatsStreamingProduceHandler(url, clusterID string, maxInflight int) (*natsStreamingProduceHandler, error) {
+func newNatsStreamingProduceHandler(url, clusterID string, maxInflight, pingIntervalSeconds, numPingTimeouts int) (*natsStreamingProduceHandler, error) {
 	nc, err := nats.Connect(url, nats.Name("proximo-nats-streaming-"+generateID()))
 	if err != nil {
 		return nil, err
 	}
-	return &natsStreamingProduceHandler{nc: nc, clusterID: clusterID, maxInflight: maxInflight}, nil
+	return &natsStreamingProduceHandler{
+		nc:                  nc,
+		clusterID:           clusterID,
+		maxInflight:         maxInflight,
+		pingIntervalSeconds: pingIntervalSeconds,
+		numPingTimeouts:     numPingTimeouts,
+	}, nil
 }
 
 func (h *natsStreamingProduceHandler) Close() error {
@@ -173,7 +181,13 @@ func (h *natsStreamingProduceHandler) Close() error {
 
 func (h *natsStreamingProduceHandler) HandleProduce(ctx context.Context, conf producerConfig, forClient chan<- *proto.Confirmation, messages <-chan *proto.Message) error {
 
-	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsConn(h.nc))
+	var disconnectErr error
+	disconnected := make(chan struct{})
+	conn, err := stan.Connect(h.clusterID, generateID(), stan.NatsConn(h.nc), stan.Pings(h.pingIntervalSeconds, h.numPingTimeouts), stan.SetConnectionLostHandler(func(_ stan.Conn, e error) {
+		fmt.Printf("connection to nats streaming lost: %v\n", e)
+		disconnectErr = e
+		close(disconnected)
+	}))
 	if err != nil {
 		return err
 	}
@@ -192,6 +206,8 @@ func (h *natsStreamingProduceHandler) HandleProduce(ctx context.Context, conf pr
 			case forClient <- &proto.Confirmation{MsgID: msg.GetId()}:
 			case <-ctx.Done():
 				return conn.Close()
+			case <-disconnected:
+				return disconnectErr
 			}
 		}
 	}

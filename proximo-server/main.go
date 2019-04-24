@@ -135,7 +135,7 @@ func main() {
 				defer h.Close()
 			}
 			if enabled[publishEndpoint] {
-				h, err := newNatsStreamingProduceHandler(*url, *cid, *maxInflight)
+				h, err := newNatsStreamingProduceHandler(*url, *cid, *maxInflight, *pingIntervalSeconds, *pingNumTimeouts)
 				if err != nil {
 					log.Fatalf("failed to connect to nats streaming for production: %v", err)
 				}
