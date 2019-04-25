@@ -15,7 +15,7 @@ jobs:
     - run: go mod download
     - run: golangci-lint run --enable-all -D=lll,gochecknoglobals,gosec
     - run: go test -v -race -cover ./...
-    - run: go build -o ./bin/sever ./cmd/proximo-server
+    - run: go build -o ./bin/server ./cmd/proximo-server
     - run: go build -o ./bin/client ./cmd/proximo-client
 
 workflows:
