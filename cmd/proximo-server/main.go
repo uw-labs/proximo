@@ -17,6 +17,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
+	"github.com/uw-labs/proximo"
+	"github.com/uw-labs/proximo/backend/kafka"
+	"github.com/uw-labs/proximo/backend/mem"
+	"github.com/uw-labs/proximo/backend/natsstreaming"
 	"github.com/uw-labs/proximo/proto"
 )
 
@@ -27,9 +31,9 @@ const (
 
 func main() {
 	var (
-		cHandler consumeHandler
-		pHandler produceHandler
-		enabled  map[string]bool
+		sourceFactory proximo.AsyncSourceFactory
+		sinkFactory   proximo.AsyncSinkFactory
+		enabled       map[string]bool
 	)
 
 	app := cli.App("proximo", "GRPC Proxy gateway for message queue systems")
@@ -78,15 +82,15 @@ func main() {
 			}
 
 			if enabled[consumeEndpoint] {
-				cHandler = &kafkaConsumeHandler{
-					brokers: brokers,
-					version: version,
+				sourceFactory = &kafka.AsyncSourceFactory{
+					Brokers: brokers,
+					Version: version,
 				}
 			}
 			if enabled[publishEndpoint] {
-				pHandler = &kafkaProduceHandler{
-					brokers: brokers,
-					version: version,
+				sinkFactory = &kafka.AsyncSinkFactory{
+					Brokers: brokers,
+					Version: version,
 				}
 			}
 
@@ -127,20 +131,19 @@ func main() {
 		})
 		cmd.Action = func() {
 			if enabled[consumeEndpoint] {
-				h, err := newNatsStreamingConsumeHandler(*url, *cid, *maxInflight, *pingIntervalSeconds, *pingNumTimeouts)
-				if err != nil {
-					log.Fatalf("failed to connect to nats streaming for consumption: %v", err)
+				sourceFactory = natsstreaming.AsyncSourceFactory{
+					URL:                    *url,
+					ClusterID:              *cid,
+					MaxInflight:            *maxInflight,
+					ConnectionNumPings:     *pingNumTimeouts,
+					ConnectionPingInterval: *pingIntervalSeconds,
 				}
-				cHandler = h
-				defer h.Close()
 			}
 			if enabled[publishEndpoint] {
-				h, err := newNatsStreamingProduceHandler(*url, *cid, *maxInflight)
-				if err != nil {
-					log.Fatalf("failed to connect to nats streaming for production: %v", err)
+				sinkFactory = natsstreaming.AsyncSinkFactory{
+					URL:       *url,
+					ClusterID: *cid,
 				}
-				pHandler = h
-				defer h.Close()
 			}
 
 			log.Printf("Using NATS streaming server at %s with cluster id %s and max inflight %v\n", *url, *cid, *maxInflight)
@@ -149,13 +152,13 @@ func main() {
 
 	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
 		cmd.Action = func() {
-			h := newMemHandler()
+			h := mem.NewBackend()
 
 			if enabled[consumeEndpoint] {
-				cHandler = h
+				sourceFactory = h
 			}
 			if enabled[publishEndpoint] {
-				pHandler = h
+				sinkFactory = h
 			}
 
 			log.Printf("Using in memory testing backend")
@@ -165,7 +168,10 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
-	log.Fatal(listenAndServe(cHandler, pHandler, *port))
+	if err := listenAndServe(sourceFactory, sinkFactory, *port); err != nil {
+		log.Fatal(err)
+	}
+	log.Println("Server terminated cleanly")
 }
 
 func parseEndpoints(endpoints string) map[string]bool {
@@ -183,7 +189,8 @@ func parseEndpoints(endpoints string) map[string]bool {
 
 	return enabled
 }
-func listenAndServe(cHandler consumeHandler, pHandler produceHandler, port int) error {
+
+func listenAndServe(sourceFactory proximo.AsyncSourceFactory, sinkFactory proximo.AsyncSinkFactory, port int) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return errors.Wrap(err, "failed to listen")
@@ -198,11 +205,11 @@ func listenAndServe(cHandler consumeHandler, pHandler produceHandler, port int) 
 	grpcServer := grpc.NewServer(opts...)
 	defer grpcServer.Stop()
 
-	if cHandler != nil {
-		proto.RegisterMessageSourceServer(grpcServer, &consumeServer{handler: cHandler})
+	if sourceFactory != nil {
+		proto.RegisterMessageSourceServer(grpcServer, &proximo.SourceServer{SourceFactory: sourceFactory})
 	}
-	if pHandler != nil {
-		proto.RegisterMessageSinkServer(grpcServer, &produceServer{handler: pHandler})
+	if sinkFactory != nil {
+		proto.RegisterMessageSinkServer(grpcServer, &proximo.SinkServer{SinkFactory: sinkFactory})
 	}
 
 	errCh := make(chan error, 1)
