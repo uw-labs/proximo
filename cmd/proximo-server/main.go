@@ -12,7 +12,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	cli "github.com/jawher/mow.cli"
-	stan "github.com/nats-io/go-nats-streaming"
+	"github.com/nats-io/stan.go"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
