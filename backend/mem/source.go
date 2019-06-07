@@ -45,5 +45,5 @@ func (s memSource) Close() error {
 }
 
 func (s memSource) Status() (*substrate.Status, error) {
-	panic("not implemented")
+	return &substrate.Status{Working: true}, nil
 }

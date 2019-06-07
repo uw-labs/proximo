@@ -63,5 +63,5 @@ func (s memSink) Close() error {
 }
 
 func (s memSink) Status() (*substrate.Status, error) {
-	panic("not implemented")
+	return &substrate.Status{Working: true}, nil
 }
