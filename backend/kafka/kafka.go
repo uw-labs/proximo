@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/Shopify/sarama"
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
 	"github.com/uw-labs/substrate/kafka"
@@ -12,7 +11,7 @@ import (
 
 type AsyncSourceFactory struct {
 	Brokers                  []string
-	Version                  *sarama.KafkaVersion
+	Version                  string
 	OffsetsRetention         time.Duration
 	MetadataRefreshFrequency time.Duration
 }
@@ -38,7 +37,7 @@ func (f AsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.Start
 
 type AsyncSinkFactory struct {
 	Brokers         []string
-	Version         *sarama.KafkaVersion
+	Version         string
 	MaxMessageBytes int
 	KeyFunc         func(substrate.Message) []byte
 }
