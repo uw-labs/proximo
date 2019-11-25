@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Shopify/sarama"
 	cli "github.com/jawher/mow.cli"
 	"github.com/nats-io/stan.go"
 	"github.com/pkg/errors"
@@ -72,25 +71,16 @@ func main() {
 		cmd.Action = func() {
 			brokers := strings.Split(*brokerString, ",")
 
-			var version *sarama.KafkaVersion
-			if kafkaVersion != nil && *kafkaVersion != "" {
-				kv, err := sarama.ParseKafkaVersion(*kafkaVersion)
-				if err != nil {
-					log.Fatalf("failed to parse kafka version: %v ", err)
-				}
-				version = &kv
-			}
-
 			if enabled[consumeEndpoint] {
 				sourceFactory = &kafka.AsyncSourceFactory{
 					Brokers: brokers,
-					Version: version,
+					Version: *kafkaVersion,
 				}
 			}
 			if enabled[publishEndpoint] {
 				sinkFactory = &kafka.AsyncSinkFactory{
 					Brokers: brokers,
-					Version: version,
+					Version: *kafkaVersion,
 				}
 			}
 
