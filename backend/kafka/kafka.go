@@ -14,6 +14,7 @@ type AsyncSourceFactory struct {
 	Version                  string
 	OffsetsRetention         time.Duration
 	MetadataRefreshFrequency time.Duration
+	SessionTimeout           time.Duration
 }
 
 func (f AsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
@@ -32,6 +33,7 @@ func (f AsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.Start
 		Version:                  f.Version,
 		OffsetsRetention:         f.OffsetsRetention,
 		MetadataRefreshFrequency: f.MetadataRefreshFrequency,
+		SessionTimeout:           f.SessionTimeout,
 	})
 }
 
