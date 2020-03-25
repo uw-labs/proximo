@@ -67,14 +67,20 @@ func main() {
 			Desc:   "Kafka Version e.g. 1.1.1, 0.10.2.0",
 			EnvVar: "PROXIMO_KAFKA_VERSION",
 		})
+		kafkaConsumerSessionTimeout := cmd.Int(cli.IntOpt{
+			Name:   "consumer-session-timeout",
+			Desc:   "Duration in seconds after which consumer session should timeout.",
+			EnvVar: "PROXIMO_KAFKA_CONSUMER_SESSION_TIMEOUT",
+		})
 
 		cmd.Action = func() {
 			brokers := strings.Split(*brokerString, ",")
 
 			if enabled[consumeEndpoint] {
 				sourceFactory = &kafka.AsyncSourceFactory{
-					Brokers: brokers,
-					Version: *kafkaVersion,
+					Brokers:        brokers,
+					Version:        *kafkaVersion,
+					SessionTimeout: time.Duration(*kafkaConsumerSessionTimeout) * time.Second,
 				}
 			}
 			if enabled[publishEndpoint] {
