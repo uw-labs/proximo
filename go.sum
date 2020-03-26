@@ -244,8 +244,8 @@ github.com/uw-labs/freezer v0.0.0-20200217144949-6d67e7edcab8/go.mod h1:fVLLU+8t
 github.com/uw-labs/proximo v0.0.0-20190913093050-8229af78f5dd/go.mod h1:qvhJ61jBx9RI4vrThNU4jroHCMpbU850pzmm+1b4fYk=
 github.com/uw-labs/straw v0.0.0-20200213162553-01e9a0f94f69/go.mod h1:V/HU8rEA5SCAbjS32ztEM2s6yt9PxqTRH9BLlmGRnAE=
 github.com/uw-labs/substrate v0.0.0-20190606111548-e9b3a4b7c12c/go.mod h1:dyyAUJcMCwdJ5EaYf8bh2rCNvSH9wwQEIpfZwt+bOn8=
-github.com/uw-labs/substrate v0.0.0-20200325102738-bcdc00ce7555 h1:+j282/vIbSTvYUtpvcDyn2CogMMjVOh5R6Uobh2ZkI0=
-github.com/uw-labs/substrate v0.0.0-20200325102738-bcdc00ce7555/go.mod h1:2hnvoJuiq8PLbhEgsgZJQfNgGjwjwDp9zpu8xz7UE2k=
+github.com/uw-labs/substrate v0.0.0-20200326193552-74f0f026b909 h1:qy4eQUjyVh8VUpcKBlUX0f3hPBCrgkxmGBI9S7UpaXc=
+github.com/uw-labs/substrate v0.0.0-20200326193552-74f0f026b909/go.mod h1:2hnvoJuiq8PLbhEgsgZJQfNgGjwjwDp9zpu8xz7UE2k=
 github.com/uw-labs/sync v0.0.0-20190307114256-1bb306bf6e71 h1:1fL6kfRp9ebXBzK3powp5uKM3dCtK62RCiadQDqcR1Q=
 github.com/uw-labs/sync v0.0.0-20190307114256-1bb306bf6e71/go.mod h1:zTU/pesbF9d3ZN7+XwKhdE50y0SCCblmzwukXRnZkXs=
 github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c/go.mod h1:lB8K/P019DLNhemzwFU4jHLhdvlE6uDZjXFejJXr49I=
