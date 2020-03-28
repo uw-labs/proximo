@@ -42,6 +42,7 @@ type AsyncSinkFactory struct {
 	Version         string
 	MaxMessageBytes int
 	KeyFunc         func(substrate.Message) []byte
+	Debug           bool
 }
 
 func (f AsyncSinkFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
@@ -51,5 +52,6 @@ func (f AsyncSinkFactory) NewAsyncSink(ctx context.Context, req *proto.StartPubl
 		Version:         f.Version,
 		MaxMessageBytes: f.MaxMessageBytes,
 		KeyFunc:         f.KeyFunc,
+		Debug:           f.Debug,
 	})
 }

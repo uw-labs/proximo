@@ -51,6 +51,13 @@ func main() {
 		EnvVar: "PROXIMO_ENDPOINTS",
 	})
 
+	debug := app.Bool(cli.BoolOpt{
+		Name:   "debug",
+		Desc:   "Produce debugging log output",
+		Value:  false,
+		EnvVar: "PROXIMO_DEBUG",
+	})
+
 	app.Before = func() {
 		enabled = parseEndpoints(*endpoints)
 	}
@@ -87,6 +94,7 @@ func main() {
 				sinkFactory = &kafka.AsyncSinkFactory{
 					Brokers: brokers,
 					Version: *kafkaVersion,
+					Debug:   *debug,
 				}
 			}
 
