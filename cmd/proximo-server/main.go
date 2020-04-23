@@ -53,7 +53,7 @@ func main() {
 
 	debug := app.Bool(cli.BoolOpt{
 		Name:   "debug",
-		Desc:   "Produce debugging log output",
+		Desc:   "Enable debug mode, which will produce log output, and may be more resource intensive",
 		Value:  false,
 		EnvVar: "PROXIMO_DEBUG",
 	})
@@ -88,6 +88,7 @@ func main() {
 					Brokers:        brokers,
 					Version:        *kafkaVersion,
 					SessionTimeout: time.Duration(*kafkaConsumerSessionTimeout) * time.Second,
+					Debug:          *debug,
 				}
 			}
 			if enabled[publishEndpoint] {
@@ -172,7 +173,10 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
-	if err := listenAndServe(sourceFactory, sinkFactory, *port); err != nil {
+	if *debug {
+		log.Println("Running in debug mode. This means producing log output and disabling message discarding.")
+	}
+	if err := listenAndServe(sourceFactory, sinkFactory, *port, *debug); err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Server terminated cleanly")
@@ -194,7 +198,7 @@ func parseEndpoints(endpoints string) map[string]bool {
 	return enabled
 }
 
-func listenAndServe(sourceFactory proximo.AsyncSourceFactory, sinkFactory proximo.AsyncSinkFactory, port int) error {
+func listenAndServe(sourceFactory proximo.AsyncSourceFactory, sinkFactory proximo.AsyncSinkFactory, port int, debug bool) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return errors.Wrap(err, "failed to listen")
@@ -210,7 +214,7 @@ func listenAndServe(sourceFactory proximo.AsyncSourceFactory, sinkFactory proxim
 	defer grpcServer.Stop()
 
 	if sourceFactory != nil {
-		proto.RegisterMessageSourceServer(grpcServer, &proximo.SourceServer{SourceFactory: sourceFactory})
+		proto.RegisterMessageSourceServer(grpcServer, &proximo.SourceServer{SourceFactory: sourceFactory, SkipDiscard: debug})
 	}
 	if sinkFactory != nil {
 		proto.RegisterMessageSinkServer(grpcServer, &proximo.SinkServer{SinkFactory: sinkFactory})

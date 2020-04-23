@@ -24,6 +24,7 @@ var (
 
 type SourceServer struct {
 	SourceFactory AsyncSourceFactory
+	SkipDiscard   bool
 }
 
 func (s *SourceServer) Consume(stream proto.MessageSource_ConsumeServer) error {
@@ -161,8 +162,10 @@ func (s *SourceServer) handleAcks(ctx context.Context, confirmations <-chan stri
 		case <-ctx.Done():
 			return nil
 		case aMsg := <-toAck:
-			if dMsg, ok := aMsg.msg.(substrate.DiscardableMessage); ok {
-				dMsg.DiscardPayload() // Discard payload to save space
+			if !s.SkipDiscard {
+				if dMsg, ok := aMsg.msg.(substrate.DiscardableMessage); ok {
+					dMsg.DiscardPayload() // Discard payload to save space
+				}
 			}
 			ackMap[aMsg.id] = aMsg.msg
 		case msgID := <-confirmations:
