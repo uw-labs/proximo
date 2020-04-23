@@ -88,6 +88,7 @@ func main() {
 					Brokers:        brokers,
 					Version:        *kafkaVersion,
 					SessionTimeout: time.Duration(*kafkaConsumerSessionTimeout) * time.Second,
+					Debug:          *debug,
 				}
 			}
 			if enabled[publishEndpoint] {
