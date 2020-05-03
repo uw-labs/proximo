@@ -79,6 +79,12 @@ func main() {
 			Desc:   "Duration in seconds after which consumer session should timeout.",
 			EnvVar: "PROXIMO_KAFKA_CONSUMER_SESSION_TIMEOUT",
 		})
+		kafkaMaxMessageBytes := cmd.Int(cli.IntOpt{
+			Name:   "max-message-bytes",
+			Desc:   "Max message bytes to use in client config.  0 means client default",
+			EnvVar: "PROXIMO_KAFKA_MAX_MESSAGE_BYTES",
+			Value:  0,
+		})
 
 		cmd.Action = func() {
 			brokers := strings.Split(*brokerString, ",")
@@ -93,9 +99,10 @@ func main() {
 			}
 			if enabled[publishEndpoint] {
 				sinkFactory = &kafka.AsyncSinkFactory{
-					Brokers: brokers,
-					Version: *kafkaVersion,
-					Debug:   *debug,
+					Brokers:         brokers,
+					Version:         *kafkaVersion,
+					Debug:           *debug,
+					MaxMessageBytes: *kafkaMaxMessageBytes,
 				}
 			}
 
