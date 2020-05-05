@@ -26,6 +26,11 @@ import (
 const (
 	consumeEndpoint = "consume"
 	publishEndpoint = "publish"
+
+	// max message sizes are not really something proximo wants to enforce; it is
+	// up to the underlying broker what they are, so we just use some large hard
+	// coded large values here to replace the 4MB default.
+	maxGRPCMessageSize = 1024 * 1024 * 128
 )
 
 func main() {
@@ -216,6 +221,8 @@ func listenAndServe(sourceFactory proximo.AsyncSourceFactory, sinkFactory proxim
 		grpc.KeepaliveParams(keepalive.ServerParameters{
 			Time: 5 * time.Minute,
 		}),
+		grpc.MaxRecvMsgSize(maxGRPCMessageSize),
+		grpc.MaxSendMsgSize(maxGRPCMessageSize),
 	}
 	grpcServer := grpc.NewServer(opts...)
 	defer grpcServer.Stop()
