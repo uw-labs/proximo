@@ -63,6 +63,12 @@ func main() {
 		EnvVar: "PROXIMO_DEBUG",
 	})
 
+	configFile := app.String(cli.StringOpt{
+		Name:   "config",
+		Desc:   "Config file",
+		EnvVar: "PROXIMO_CONFIG",
+	})
+
 	app.Before = func() {
 		enabled = parseEndpoints(*endpoints)
 	}
@@ -185,12 +191,40 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
+
 	if *debug {
 		log.Println("Running in debug mode. This means producing log output and disabling message discarding.")
 	}
+
+	if configFile != nil {
+		conf, err := ConfigFromFile(*configFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if sourceFactory != nil {
+			s, err := ProximoACLSourceFactory(conf, sourceFactory)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			sourceFactory = s
+		}
+
+		if sinkFactory != nil {
+			s, err := ProximoACLSinkFactory(conf, sinkFactory)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			sinkFactory = s
+		}
+	}
+
 	if err := listenAndServe(sourceFactory, sinkFactory, *port, *debug); err != nil {
 		log.Fatal(err)
 	}
+
 	log.Println("Server terminated cleanly")
 }
 
