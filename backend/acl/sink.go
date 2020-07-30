@@ -9,19 +9,12 @@ import (
 )
 
 type AsyncSinkFactory struct {
-	cfg  Config
-	sink proximo.AsyncSinkFactory
+	Config Config
+	Next   proximo.AsyncSinkFactory
 }
 
-func ProximoACLSinkFactory(cfg Config, factory proximo.AsyncSinkFactory) (proximo.AsyncSinkFactory, error) {
-	return &AsyncSinkFactory{
-		cfg:  cfg,
-		sink: factory,
-	}, nil
-}
-
-func (s *AsyncSinkFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
-	scope, err := s.cfg.GetClientScope(ctx)
+func (s AsyncSinkFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
+	scope, err := s.Config.GetClientScope(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -30,5 +23,5 @@ func (s *AsyncSinkFactory) NewAsyncSink(ctx context.Context, req *proto.StartPub
 		return nil, ErrUnauthorized
 	}
 
-	return s.sink.NewAsyncSink(ctx, req)
+	return s.Next.NewAsyncSink(ctx, req)
 }

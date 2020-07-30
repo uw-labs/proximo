@@ -9,19 +9,12 @@ import (
 )
 
 type AsyncSourceFactory struct {
-	cfg    Config
-	source proximo.AsyncSourceFactory
+	Config Config
+	Next   proximo.AsyncSourceFactory
 }
 
-func ProximoACLSourceFactory(cfg Config, factory proximo.AsyncSourceFactory) (proximo.AsyncSourceFactory, error) {
-	return &AsyncSourceFactory{
-		cfg:    cfg,
-		source: factory,
-	}, nil
-}
-
-func (s *AsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
-	scope, err := s.cfg.GetClientScope(ctx)
+func (s AsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+	scope, err := s.Config.GetClientScope(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -30,5 +23,5 @@ func (s *AsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.Star
 		return nil, ErrUnauthorized
 	}
 
-	return s.source.NewAsyncSource(ctx, req)
+	return s.Next.NewAsyncSource(ctx, req)
 }

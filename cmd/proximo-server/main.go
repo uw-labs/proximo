@@ -204,21 +204,17 @@ func main() {
 		}
 
 		if sourceFactory != nil {
-			s, err := acl.ProximoACLSourceFactory(cfg, sourceFactory)
-			if err != nil {
-				log.Fatal(err)
+			sourceFactory = acl.AsyncSourceFactory{
+				Config: cfg,
+				Next:   sourceFactory,
 			}
-
-			sourceFactory = s
 		}
 
 		if sinkFactory != nil {
-			s, err := acl.ProximoACLSinkFactory(cfg, sinkFactory)
-			if err != nil {
-				log.Fatal(err)
+			sinkFactory = acl.AsyncSinkFactory{
+				Config: cfg,
+				Next:   sinkFactory,
 			}
-
-			sinkFactory = s
 		}
 	}
 
