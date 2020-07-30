@@ -100,12 +100,12 @@ func (s *ACLFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRe
 func (s *ACLFactory) getScope(ctx context.Context) (*Scope, error) {
 	val := metautils.ExtractIncoming(ctx).Get("authorization")
 	if val == "" {
-		return nil, ErrUnauthorized
+		return &s.store.defaultScope, nil
 	}
 
-	basicAuth, err := grpc_auth.AuthFromMD(ctx, "basic")
+	basicAuth, err := grpc_auth.AuthFromMD(ctx, "Bearer")
 	if err != nil {
-		return &s.store.defaultScope, nil
+		return nil, ErrUnauthorized
 	}
 
 	payload, err := base64.StdEncoding.DecodeString(basicAuth)

@@ -22,9 +22,9 @@ roles:
 clients:
 
 - id: "tiger-producer"
-  secret: "my-secret" # bcrypt secret
+  secret: "$2y$10$2AzC3Z8L18cP.crFi.ZDsuFdbwrYu16Lnh8y7U1wMO3QPanYuwJIm" # bcrypt secret
   roles: ["tiger-publisher"]
 
 - id: "cat-indexer"
-  secret: "my-secret" # bcrypt secret
+  secret: "$2y$10$heYVR9ipg4QUSmBljAoSgO22MSx20I6L8x1AQqGeOTxFyJZXr6uS2" # bcrypt secret
   roles: ["cat-consumer"]
