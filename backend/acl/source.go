@@ -8,19 +8,19 @@ import (
 	"github.com/uw-labs/substrate"
 )
 
-type ACLFactorySource struct {
-	cfg    ACLConfig
+type AsyncSourceFactory struct {
+	cfg    Config
 	source proximo.AsyncSourceFactory
 }
 
-func ProximoACLSourceFactory(cfg ACLConfig, factory proximo.AsyncSourceFactory) (proximo.AsyncSourceFactory, error) {
-	return &ACLFactorySource{
+func ProximoACLSourceFactory(cfg Config, factory proximo.AsyncSourceFactory) (proximo.AsyncSourceFactory, error) {
+	return &AsyncSourceFactory{
 		cfg:    cfg,
 		source: factory,
 	}, nil
 }
 
-func (s *ACLFactorySource) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
+func (s *AsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
 	scope, err := s.cfg.GetClientScope(ctx)
 	if err != nil {
 		return nil, err

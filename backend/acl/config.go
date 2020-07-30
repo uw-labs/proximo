@@ -17,19 +17,22 @@ import (
 )
 
 var (
+	// ErrUnauthorized indicates that a client doesn't have access to a resource
 	ErrUnauthorized = status.Errorf(codes.PermissionDenied, "unauthorised")
 )
 
-type ACLConfig interface {
+// Config allows retrieve of access scope for the current client
+type Config interface {
 	GetClientScope(ctx context.Context) (*Scope, error)
 }
 
+// Scope contains the access rights for a particular client
 type Scope struct {
 	Consume []*regexp.Regexp
 	Publish []*regexp.Regexp
 }
 
-type aclConfigYaml struct {
+type configYaml struct {
 	Default struct {
 		Roles []string `yaml:"roles"`
 	} `yaml:"default"`
@@ -45,14 +48,15 @@ type aclConfigYaml struct {
 	} `yaml:"clients"`
 }
 
-type aclConfig struct {
+type config struct {
 	auth         map[string][]byte
 	defaultScope Scope
 	scopes       map[string]*Scope
 }
 
-func ConfigFromFile(configFile string) (ACLConfig, error) {
-	var conf aclConfigYaml
+// ConfigFromFile parses and compiles ACL config from a yaml file
+func ConfigFromFile(configFile string) (Config, error) {
+	var conf configYaml
 
 	dat, err := ioutil.ReadFile(configFile)
 	if err != nil {
@@ -73,7 +77,25 @@ func ConfigFromFile(configFile string) (ACLConfig, error) {
 	return store, nil
 }
 
-func (s *aclConfig) GetClientScope(ctx context.Context) (*Scope, error) {
+// ConfigFromString parses and compiles ACL config from a string
+func ConfigFromString(configString string) (Config, error) {
+	var conf configYaml
+
+	err := yaml.Unmarshal([]byte(configString), &conf)
+	if err != nil {
+		return nil, err
+
+	}
+
+	store, err := compileConfig(conf)
+	if err != nil {
+		return nil, err
+	}
+
+	return store, nil
+}
+
+func (s *config) GetClientScope(ctx context.Context) (*Scope, error) {
 	val := metautils.ExtractIncoming(ctx).Get("authorization")
 	if val == "" {
 		return &s.defaultScope, nil
@@ -86,7 +108,7 @@ func (s *aclConfig) GetClientScope(ctx context.Context) (*Scope, error) {
 
 	payload, err := base64.StdEncoding.DecodeString(basicAuth)
 	if err != nil {
-		return nil, err
+		return nil, ErrUnauthorized
 	}
 
 	pair := strings.SplitN(string(payload), ":", 2)
@@ -109,7 +131,7 @@ func (s *aclConfig) GetClientScope(ctx context.Context) (*Scope, error) {
 	return s.scopes[id], nil
 }
 
-func compileConfig(yamlCfg aclConfigYaml) (*aclConfig, error) {
+func compileConfig(yamlCfg configYaml) (*config, error) {
 	auth := make(map[string][]byte)
 	scopes := make(map[string]*Scope)
 
@@ -134,7 +156,7 @@ func compileConfig(yamlCfg aclConfigYaml) (*aclConfig, error) {
 		scopes[c.ID] = s
 	}
 
-	return &aclConfig{
+	return &config{
 		auth:         auth,
 		defaultScope: *defaultScope,
 		scopes:       scopes,
@@ -157,7 +179,7 @@ func compileScopes(roles []string, rolesMap map[string]*Scope) (*Scope, error) {
 	return result, nil
 }
 
-func compileRoles(cfg aclConfigYaml) (map[string]*Scope, error) {
+func compileRoles(cfg configYaml) (map[string]*Scope, error) {
 	roles := make(map[string]*Scope)
 
 	for _, r := range cfg.Roles {

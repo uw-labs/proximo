@@ -8,19 +8,19 @@ import (
 	"github.com/uw-labs/substrate"
 )
 
-type ACLFactorySink struct {
-	cfg  ACLConfig
+type AsyncSinkFactory struct {
+	cfg  Config
 	sink proximo.AsyncSinkFactory
 }
 
-func ProximoACLSinkFactory(cfg ACLConfig, factory proximo.AsyncSinkFactory) (proximo.AsyncSinkFactory, error) {
-	return &ACLFactorySink{
+func ProximoACLSinkFactory(cfg Config, factory proximo.AsyncSinkFactory) (proximo.AsyncSinkFactory, error) {
+	return &AsyncSinkFactory{
 		cfg:  cfg,
 		sink: factory,
 	}, nil
 }
 
-func (s *ACLFactorySink) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
+func (s *AsyncSinkFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
 	scope, err := s.cfg.GetClientScope(ctx)
 	if err != nil {
 		return nil, err
