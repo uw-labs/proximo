@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 
 	"github.com/uw-labs/proximo"
+	"github.com/uw-labs/proximo/backend/acl"
 	"github.com/uw-labs/proximo/backend/kafka"
 	"github.com/uw-labs/proximo/backend/mem"
 	"github.com/uw-labs/proximo/backend/natsstreaming"
@@ -197,13 +198,13 @@ func main() {
 	}
 
 	if configFile != nil {
-		conf, err := ConfigFromFile(*configFile)
+		cfg, err := acl.ConfigFromFile(*configFile)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		if sourceFactory != nil {
-			s, err := ProximoACLSourceFactory(conf, sourceFactory)
+			s, err := acl.ProximoACLSourceFactory(cfg, sourceFactory)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -212,7 +213,7 @@ func main() {
 		}
 
 		if sinkFactory != nil {
-			s, err := ProximoACLSinkFactory(conf, sinkFactory)
+			s, err := acl.ProximoACLSinkFactory(cfg, sinkFactory)
 			if err != nil {
 				log.Fatal(err)
 			}

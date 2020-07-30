@@ -1,9 +1,8 @@
-package main
+package acl
 
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"regexp"
@@ -11,10 +10,9 @@ import (
 
 	grpc_auth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
-	"github.com/uw-labs/proximo"
-	"github.com/uw-labs/proximo/proto"
-	"github.com/uw-labs/substrate"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gopkg.in/yaml.v2"
 )
 
@@ -22,7 +20,16 @@ var (
 	ErrUnauthorized = status.Errorf(codes.PermissionDenied, "unauthorised")
 )
 
-type ACLConfig struct {
+type ACLConfig interface {
+	GetClientScope(ctx context.Context) (*Scope, error)
+}
+
+type Scope struct {
+	Consume []*regexp.Regexp
+	Publish []*regexp.Regexp
+}
+
+type aclConfigYaml struct {
 	Default struct {
 		Roles []string `yaml:"roles"`
 	} `yaml:"default"`
@@ -38,69 +45,38 @@ type ACLConfig struct {
 	} `yaml:"clients"`
 }
 
-type Scope struct {
-	Consume []*regexp.Regexp
-	Publish []*regexp.Regexp
-}
-
-type aclStore struct {
+type aclConfig struct {
 	auth         map[string][]byte
 	defaultScope Scope
 	scopes       map[string]*Scope
 }
 
 func ConfigFromFile(configFile string) (ACLConfig, error) {
-	var conf ACLConfig
+	var conf aclConfigYaml
 
 	dat, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		return conf, err
+		return nil, err
 	}
 
 	err = yaml.Unmarshal(dat, &conf)
 	if err != nil {
-		return conf, err
+		return nil, err
+
 	}
 
-	return conf, nil
-}
-
-type ACLFactory struct {
-	store  *aclStore
-	source proximo.AsyncSourceFactory
-	sink   proximo.AsyncSinkFactory
-}
-
-func (s *ACLFactory) NewAsyncSource(ctx context.Context, req *proto.StartConsumeRequest) (substrate.AsyncMessageSource, error) {
-	scope, err := s.getScope(ctx)
+	store, err := compileConfig(conf)
 	if err != nil {
 		return nil, err
 	}
 
-	if !containsRegex(scope.Consume, req.Topic) {
-		return nil, ErrUnauthorized
-	}
-
-	return s.source.NewAsyncSource(ctx, req)
+	return store, nil
 }
 
-func (s *ACLFactory) NewAsyncSink(ctx context.Context, req *proto.StartPublishRequest) (substrate.AsyncMessageSink, error) {
-	scope, err := s.getScope(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if !containsRegex(scope.Publish, req.Topic) {
-		return nil, ErrUnauthorized
-	}
-
-	return s.sink.NewAsyncSink(ctx, req)
-}
-
-func (s *ACLFactory) getScope(ctx context.Context) (*Scope, error) {
+func (s *aclConfig) GetClientScope(ctx context.Context) (*Scope, error) {
 	val := metautils.ExtractIncoming(ctx).Get("authorization")
 	if val == "" {
-		return &s.store.defaultScope, nil
+		return &s.defaultScope, nil
 	}
 
 	basicAuth, err := grpc_auth.AuthFromMD(ctx, "Bearer")
@@ -121,7 +97,7 @@ func (s *ACLFactory) getScope(ctx context.Context) (*Scope, error) {
 
 	id, secret := pair[0], pair[1]
 
-	hashPass, ok := s.store.auth[id]
+	hashPass, ok := s.auth[id]
 	if !ok {
 		return nil, ErrUnauthorized
 	}
@@ -130,51 +106,27 @@ func (s *ACLFactory) getScope(ctx context.Context) (*Scope, error) {
 		return nil, ErrUnauthorized
 	}
 
-	return s.store.scopes[id], nil
+	return s.scopes[id], nil
 }
 
-func ProximoACLSourceFactory(config ACLConfig, factory proximo.AsyncSourceFactory) (proximo.AsyncSourceFactory, error) {
-	store, err := compileConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ACLFactory{
-		store:  store,
-		source: factory,
-	}, nil
-}
-
-func ProximoACLSinkFactory(config ACLConfig, factory proximo.AsyncSinkFactory) (proximo.AsyncSinkFactory, error) {
-	store, err := compileConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ACLFactory{
-		store: store,
-		sink:  factory,
-	}, nil
-}
-
-func compileConfig(config ACLConfig) (*aclStore, error) {
+func compileConfig(yamlCfg aclConfigYaml) (*aclConfig, error) {
 	auth := make(map[string][]byte)
 	scopes := make(map[string]*Scope)
 
-	roles, err := compileRoles(config)
+	roles, err := compileRoles(yamlCfg)
 	if err != nil {
 		return nil, err
 	}
 
-	defaultScope, err := compileScopes(config.Default.Roles, roles)
+	defaultScope, err := compileScopes(yamlCfg.Default.Roles, roles)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, c := range config.Clients {
+	for _, c := range yamlCfg.Clients {
 		auth[c.ID] = []byte(c.Secret)
 
-		s, err := compileScopes(append(config.Default.Roles, c.Roles...), roles)
+		s, err := compileScopes(append(yamlCfg.Default.Roles, c.Roles...), roles)
 		if err != nil {
 			return nil, err
 		}
@@ -182,7 +134,7 @@ func compileConfig(config ACLConfig) (*aclStore, error) {
 		scopes[c.ID] = s
 	}
 
-	return &aclStore{
+	return &aclConfig{
 		auth:         auth,
 		defaultScope: *defaultScope,
 		scopes:       scopes,
@@ -205,10 +157,10 @@ func compileScopes(roles []string, rolesMap map[string]*Scope) (*Scope, error) {
 	return result, nil
 }
 
-func compileRoles(config ACLConfig) (map[string]*Scope, error) {
+func compileRoles(cfg aclConfigYaml) (map[string]*Scope, error) {
 	roles := make(map[string]*Scope)
 
-	for _, r := range config.Roles {
+	for _, r := range cfg.Roles {
 		s := &Scope{}
 
 		for _, c := range r.Consume {
