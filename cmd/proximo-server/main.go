@@ -64,9 +64,9 @@ func main() {
 	})
 
 	configFile := app.String(cli.StringOpt{
-		Name:   "config",
-		Desc:   "Config file",
-		EnvVar: "PROXIMO_CONFIG",
+		Name:   "acl-config",
+		Desc:   "ACL Config file",
+		EnvVar: "PROXIMO_ACL_CONFIG",
 	})
 
 	app.Before = func() {
