@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	ErrUnauthorized = errors.New("unauthorized")
+	ErrUnauthorized = status.Errorf(codes.PermissionDenied, "unauthorised")
 )
 
 type ACLConfig struct {
