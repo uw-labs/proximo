@@ -1,0 +1,30 @@
+default:
+  roles: ["dogs-stuff"]
+
+roles:
+
+- id: "dogs-stuff"
+  consume: ["dogs"]
+
+- id: "consume-everything"
+  consume: [".*"]
+
+- id: "tiger-publisher"
+  publish: ["tigers"]
+
+- id: "lion-publisher"
+  publish: ["tigers"]
+
+- id: "cat-consumer"
+  publish: ["tigers"]
+  consume: ["tigers", "lions.*"]
+
+clients:
+
+- id: "tiger-producer"
+  secret: "$2y$10$2AzC3Z8L18cP.crFi.ZDsuFdbwrYu16Lnh8y7U1wMO3QPanYuwJIm" # bcrypt secret
+  roles: ["tiger-publisher"]
+
+- id: "cat-indexer"
+  secret: "$2y$10$heYVR9ipg4QUSmBljAoSgO22MSx20I6L8x1AQqGeOTxFyJZXr6uS2" # bcrypt secret
+  roles: ["cat-consumer"]

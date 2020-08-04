@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 
 	"github.com/uw-labs/proximo"
+	"github.com/uw-labs/proximo/backend/acl"
 	"github.com/uw-labs/proximo/backend/kafka"
 	"github.com/uw-labs/proximo/backend/mem"
 	"github.com/uw-labs/proximo/backend/natsstreaming"
@@ -61,6 +62,12 @@ func main() {
 		Desc:   "Enable debug mode, which will produce log output, and may be more resource intensive",
 		Value:  false,
 		EnvVar: "PROXIMO_DEBUG",
+	})
+
+	configFile := app.String(cli.StringOpt{
+		Name:   "acl-config",
+		Desc:   "ACL Config file",
+		EnvVar: "PROXIMO_ACL_CONFIG",
 	})
 
 	app.Before = func() {
@@ -185,12 +192,36 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
+
 	if *debug {
 		log.Println("Running in debug mode. This means producing log output and disabling message discarding.")
 	}
+
+	if configFile != nil {
+		cfg, err := acl.ConfigFromFile(*configFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if sourceFactory != nil {
+			sourceFactory = acl.AsyncSourceFactory{
+				Config: cfg,
+				Next:   sourceFactory,
+			}
+		}
+
+		if sinkFactory != nil {
+			sinkFactory = acl.AsyncSinkFactory{
+				Config: cfg,
+				Next:   sinkFactory,
+			}
+		}
+	}
+
 	if err := listenAndServe(sourceFactory, sinkFactory, *port, *debug); err != nil {
 		log.Fatal(err)
 	}
+
 	log.Println("Server terminated cleanly")
 }
 
