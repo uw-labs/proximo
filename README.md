@@ -33,3 +33,39 @@ proximo from go
 
 [protobuf definitions](proto/)
 
+## Access Control
+
+Access Control is supported using an optional config file, using the `PROXIMO_ACL_CONFIG`.
+
+In this example, all clients can access the topics that start with `products` but only a client called
+`product-writer` has permission to to write to these topics.
+
+```yaml
+default:
+  roles: ["read-products"]
+roles:
+- id: "read-products"
+  consume: ["products.*"]
+- id: "write-products"
+  publish: ["products.*"]
+clients:
+- id: "product-writer"
+  secret: "$2y$10$2AzC3Z8L18cP.crFi.ZDsuFdbwrYu16Lnh8y7U1wMO3QPanYuwJIm" # pass is bcrypted hash of "password"
+  roles: ["write-products"]
+```
+
+Add the token to the context, example:
+
+```golang
+sink, _ := proximo.NewAsyncMessageSink(proximo.AsyncMessageSinkConfig{
+  Broker:   "localhost:6868",
+  Topic:    "products",
+  Insecure: true,
+})
+
+token := base64.StdEncoding.EncodeToString(fmt.Sprintf("%s:%s", "product-writer", "password"))
+md := metadata.Pairs("Authorization", fmt.Sprintf("Bearer %s", token))
+reqCtx := metadata.NewOutgoingContext(ctx, md)
+
+sink.PublishMessage(reqCtx, &Message{Data: []byte("hello world")})
+```
