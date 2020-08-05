@@ -197,7 +197,7 @@ func main() {
 		log.Println("Running in debug mode. This means producing log output and disabling message discarding.")
 	}
 
-	if configFile != nil {
+	if *configFile != "" {
 		cfg, err := acl.ConfigFromFile(*configFile)
 		if err != nil {
 			log.Fatal(err)
