@@ -19,7 +19,7 @@ func (s AsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.Start
 		return nil, err
 	}
 
-	if !containsRegex(scope.Publish, req.Topic) {
+	if !containsRegex(scope.Consume, req.Topic) {
 		return nil, ErrUnauthorized
 	}
 
