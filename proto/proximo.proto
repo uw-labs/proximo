@@ -5,6 +5,7 @@ package proximo;
 message Message {
   bytes data = 1;
   string id = 2;
+  bytes key = 3;
 }
 
 // Consumer types

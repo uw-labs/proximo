@@ -15,13 +15,15 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/uw-labs/proximo"
 	"github.com/uw-labs/proximo/backend/acl"
 	"github.com/uw-labs/proximo/backend/kafka"
 	"github.com/uw-labs/proximo/backend/mem"
 	"github.com/uw-labs/proximo/backend/natsstreaming"
-	"github.com/uw-labs/proximo/proto"
+	proximo_proto "github.com/uw-labs/proximo/proto"
+	"github.com/uw-labs/substrate"
 )
 
 const (
@@ -115,6 +117,13 @@ func main() {
 					Version:         *kafkaVersion,
 					Debug:           *debug,
 					MaxMessageBytes: *kafkaMaxMessageBytes,
+					KeyFunc: func(message substrate.Message) []byte {
+						var msg proximo_proto.Message
+						if err := proto.Unmarshal(message.Data(), &msg); err != nil {
+							panic(err)
+						}
+						return msg.GetKey()
+					},
 				}
 			}
 
@@ -259,10 +268,10 @@ func listenAndServe(sourceFactory proximo.AsyncSourceFactory, sinkFactory proxim
 	defer grpcServer.Stop()
 
 	if sourceFactory != nil {
-		proto.RegisterMessageSourceServer(grpcServer, &proximo.SourceServer{SourceFactory: sourceFactory, SkipDiscard: debug})
+		proximo_proto.RegisterMessageSourceServer(grpcServer, &proximo.SourceServer{SourceFactory: sourceFactory, SkipDiscard: debug})
 	}
 	if sinkFactory != nil {
-		proto.RegisterMessageSinkServer(grpcServer, &proximo.SinkServer{SinkFactory: sinkFactory})
+		proximo_proto.RegisterMessageSinkServer(grpcServer, &proximo.SinkServer{SinkFactory: sinkFactory})
 	}
 
 	errCh := make(chan error, 1)
