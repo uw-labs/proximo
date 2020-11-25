@@ -18,7 +18,7 @@ import (
 	"github.com/uw-labs/proximo/backend/kafka"
 	"github.com/uw-labs/proximo/backend/mem"
 	"github.com/uw-labs/proximo/backend/natsstreaming"
-	proximo_proto "github.com/uw-labs/proximo/proto"
+	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
@@ -266,10 +266,10 @@ func listenAndServe(sourceFactory proximo.AsyncSourceFactory, sinkFactory proxim
 	defer grpcServer.Stop()
 
 	if sourceFactory != nil {
-		proximo_proto.RegisterMessageSourceServer(grpcServer, &proximo.SourceServer{SourceFactory: sourceFactory, SkipDiscard: debug})
+		proto.RegisterMessageSourceServer(grpcServer, &proximo.SourceServer{SourceFactory: sourceFactory, SkipDiscard: debug})
 	}
 	if sinkFactory != nil {
-		proximo_proto.RegisterMessageSinkServer(grpcServer, &proximo.SinkServer{SinkFactory: sinkFactory})
+		proto.RegisterMessageSinkServer(grpcServer, &proximo.SinkServer{SinkFactory: sinkFactory})
 	}
 
 	errCh := make(chan error, 1)
