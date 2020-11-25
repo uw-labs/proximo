@@ -13,10 +13,6 @@ import (
 	cli "github.com/jawher/mow.cli"
 	"github.com/nats-io/stan.go"
 	"github.com/pkg/errors"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/uw-labs/proximo"
 	"github.com/uw-labs/proximo/backend/acl"
 	"github.com/uw-labs/proximo/backend/kafka"
@@ -24,6 +20,8 @@ import (
 	"github.com/uw-labs/proximo/backend/natsstreaming"
 	proximo_proto "github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 const (
@@ -118,11 +116,11 @@ func main() {
 					Debug:           *debug,
 					MaxMessageBytes: *kafkaMaxMessageBytes,
 					KeyFunc: func(message substrate.Message) []byte {
-						var msg proximo_proto.Message
-						if err := proto.Unmarshal(message.Data(), &msg); err != nil {
-							panic(err)
+						if msg, ok := message.(*proximo.Message); ok {
+							return msg.Key()
 						}
-						return msg.GetKey()
+
+						return nil
 					},
 				}
 			}
