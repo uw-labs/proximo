@@ -88,7 +88,7 @@ func (s *SinkServer) receiveMessages(ctx context.Context, stream receiveSinkStre
 				return errNotConnected
 			}
 			select {
-			case messages <- &Message{msg: msg.GetMsg()}:
+			case messages <- &proximoMsg{msg: msg.GetMsg()}:
 			case <-ctx.Done():
 				return nil
 			}
@@ -108,7 +108,7 @@ func (s *SinkServer) sendConfirmations(ctx context.Context, stream sendSinkStrea
 	for {
 		select {
 		case msg := <-forClient:
-			pMsg, ok := msg.(*Message)
+			pMsg, ok := msg.(*proximoMsg)
 			if !ok {
 				return errors.Errorf("unexpected message: %v", pMsg)
 			}
@@ -121,16 +121,18 @@ func (s *SinkServer) sendConfirmations(ctx context.Context, stream sendSinkStrea
 	}
 }
 
-// The Message type is an implementation of substrate.Message that contains the event
-// payload and its key.
-type Message struct {
+type proximoMsg struct {
 	msg *proto.Message
 }
 
-func (m *Message) Data() []byte {
+func (m *proximoMsg) Data() []byte {
 	return m.msg.Data
 }
 
-func (m *Message) Key() []byte {
+func (m *proximoMsg) Key() []byte {
+	// If no key is provided, use the message as the key.
+	if len(m.msg.GetKey()) == 0 {
+		return m.msg.GetData()
+	}
 	return m.msg.GetKey()
 }

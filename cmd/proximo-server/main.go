@@ -34,6 +34,10 @@ const (
 	maxGRPCMessageSize = 1024 * 1024 * 128
 )
 
+type keyedMessage interface {
+	Key() []byte
+}
+
 func main() {
 	var (
 		sourceFactory proximo.AsyncSourceFactory
@@ -116,7 +120,7 @@ func main() {
 					Debug:           *debug,
 					MaxMessageBytes: *kafkaMaxMessageBytes,
 					KeyFunc: func(message substrate.Message) []byte {
-						if msg, ok := message.(*proximo.Message); ok {
+						if msg, ok := message.(keyedMessage); ok {
 							return msg.Key()
 						}
 
