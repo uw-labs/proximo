@@ -128,3 +128,11 @@ type proximoMsg struct {
 func (m *proximoMsg) Data() []byte {
 	return m.msg.Data
 }
+
+func (m *proximoMsg) Key() []byte {
+	// If no key is provided, use the message as the key.
+	if len(m.msg.GetKey()) == 0 {
+		return m.msg.GetData()
+	}
+	return m.msg.GetKey()
+}

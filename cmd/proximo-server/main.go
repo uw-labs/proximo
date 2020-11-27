@@ -13,15 +13,15 @@ import (
 	cli "github.com/jawher/mow.cli"
 	"github.com/nats-io/stan.go"
 	"github.com/pkg/errors"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
-
 	"github.com/uw-labs/proximo"
 	"github.com/uw-labs/proximo/backend/acl"
 	"github.com/uw-labs/proximo/backend/kafka"
 	"github.com/uw-labs/proximo/backend/mem"
 	"github.com/uw-labs/proximo/backend/natsstreaming"
 	"github.com/uw-labs/proximo/proto"
+	"github.com/uw-labs/substrate"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 const (
@@ -33,6 +33,10 @@ const (
 	// coded large values here to replace the 4MB default.
 	maxGRPCMessageSize = 1024 * 1024 * 128
 )
+
+type keyedMessage interface {
+	Key() []byte
+}
 
 func main() {
 	var (
@@ -115,6 +119,13 @@ func main() {
 					Version:         *kafkaVersion,
 					Debug:           *debug,
 					MaxMessageBytes: *kafkaMaxMessageBytes,
+					KeyFunc: func(message substrate.Message) []byte {
+						if msg, ok := message.(keyedMessage); ok {
+							return msg.Key()
+						}
+
+						return nil
+					},
 				}
 			}
 
