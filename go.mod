@@ -10,7 +10,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.4.0
 	github.com/urfave/cli v1.22.2
-	github.com/uw-labs/substrate v0.0.0-20200423155849-5805738940ec
+	github.com/uw-labs/substrate v0.0.0-20201023111501-59196123a2be
 	github.com/uw-labs/sync v0.0.0-20190307114256-1bb306bf6e71
 	golang.org/x/crypto v0.0.0-20200210222208-86ce3cb69678
 	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
