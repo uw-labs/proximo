@@ -1,0 +1,8 @@
+version: v1beta1
+name: buf.build/utilitywarehouse/partner-mono
+build:
+  roots:
+    - proto
+breaking:
+  use:
+    - FILE
