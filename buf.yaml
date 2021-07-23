@@ -1,0 +1,8 @@
+version: v1beta1
+name: buf.build/uw-labs/proximo
+build:
+  roots:
+    - proto
+breaking:
+  use:
+    - FILE
