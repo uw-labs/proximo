@@ -1,5 +1,5 @@
 version: v1beta1
-name: buf.build/utilitywarehouse/partner-mono
+name: buf.build/uw-labs/proximo
 build:
   roots:
     - proto
