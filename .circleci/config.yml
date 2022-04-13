@@ -3,13 +3,13 @@ version: 2
 jobs:
   test:
     docker:
-      - image: circleci/golang:1
+      - image: cimg/go:1.18
     steps:
-    - checkout
-    - run: make protos && git add --all && git diff --staged --exit-code
-    - run: go test -v -race -cover ./...
-    - run: go build -o ./bin/server ./cmd/proximo-server
-    - run: go build -o ./bin/client ./cmd/proximo-client
+      - checkout
+      - run: make protos && git add --all && git diff --staged --exit-code
+      - run: go test -v -race -cover ./...
+      - run: go build -o ./bin/server ./cmd/proximo-server
+      - run: go build -o ./bin/client ./cmd/proximo-client
 
 workflows:
   version: 2
