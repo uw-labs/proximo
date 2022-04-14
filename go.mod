@@ -4,7 +4,7 @@ go 1.18
 
 // pinning to previous version until
 // https://github.com/Shopify/sarama/issues/2150 is released
-replace github.com/Shopify/sarama v1.32.0 => github.com/Shopify/sarama v1.31.1
+replace github.com/Shopify/sarama v1.32.0 => github.com/Shopify/sarama v1.30.1
 
 require (
 	github.com/bufbuild/buf v1.3.1
