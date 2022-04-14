@@ -2,6 +2,10 @@ module github.com/uw-labs/proximo
 
 go 1.18
 
+// pinning to previous version until
+// https://github.com/Shopify/sarama/issues/2150 is released
+replace github.com/Shopify/sarama v1.32.0 => github.com/Shopify/sarama v1.31.1
+
 require (
 	github.com/bufbuild/buf v1.3.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
