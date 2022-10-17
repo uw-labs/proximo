@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"strings"
 
@@ -58,7 +58,7 @@ type config struct {
 func ConfigFromFile(configFile string) (Config, error) {
 	var conf configYaml
 
-	dat, err := ioutil.ReadFile(configFile)
+	dat, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, err
 	}

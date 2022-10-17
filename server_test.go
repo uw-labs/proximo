@@ -11,6 +11,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 
@@ -52,7 +53,7 @@ func Setup() error {
 	}()
 
 	// Wait for server to start
-	cc, err := grpc.Dial("localhost:6868", grpc.WithInsecure(), grpc.WithBlock())
+	cc, err := grpc.Dial("localhost:6868", grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {
 		return errors.Wrap(err, "failed to open client connection")
 	}

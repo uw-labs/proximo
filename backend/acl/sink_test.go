@@ -24,6 +24,8 @@ clients:
   secret: "%s"
   roles: ["read-dogs"]`, passwordHash))
 
+	require.NoError(t, err)
+
 	s := AsyncSinkFactory{
 		Config: c,
 		Next:   backend{},
@@ -56,6 +58,8 @@ clients:
 		Config: c,
 		Next:   backend{},
 	}
+
+	require.NoError(t, err)
 
 	ctx := createCtx("dog-publisher", password)
 

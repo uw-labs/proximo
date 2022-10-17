@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -95,7 +95,7 @@ func produce(endpoint string, topic string) error {
 	client := substrate.NewSynchronousMessageSink(sink)
 	defer client.Close()
 
-	all, err := ioutil.ReadAll(os.Stdin)
+	all, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return err
 	}
