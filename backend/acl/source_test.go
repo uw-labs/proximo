@@ -22,6 +22,8 @@ clients:
   secret: "%s"
   roles: ["write-dogs"]`, passwordHash))
 
+	require.NoError(t, err)
+
 	s := AsyncSourceFactory{
 		Config: c,
 		Next:   backend{},
@@ -49,6 +51,8 @@ clients:
 - id: "dog-consumer"
   secret: "%s"
   roles: ["read-dogs"]`, passwordHash))
+
+	require.NoError(t, err)
 
 	s := AsyncSourceFactory{
 		Config: c,
