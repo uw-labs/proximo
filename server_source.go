@@ -138,6 +138,9 @@ func (s *SourceServer) sendMessages(ctx context.Context, stream sendSourceStream
 				// once the message is passed to the ack handler.
 				Data: msg.Data(),
 			}
+			if km, ok := msg.(substrate.KeyedMessage); ok {
+				pMsg.Key = km.Key()
+			}
 			select {
 			case <-ctx.Done():
 				return nil
