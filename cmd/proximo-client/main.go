@@ -72,6 +72,9 @@ func consume(endpoint string, topic string, consumerID string) error {
 	err = client.ConsumeMessages(
 		newContext(),
 		func(_ context.Context, msg substrate.Message) error {
+			if km, ok := msg.(substrate.KeyedMessage); ok {
+				fmt.Printf("key: %s\n", km.Key())
+			}
 			fmt.Printf("%s", msg.Data())
 			return nil
 		},

@@ -126,5 +126,14 @@ type proximoMsg struct {
 }
 
 func (m *proximoMsg) Data() []byte {
-	return m.msg.Data
+	return m.msg.GetData()
+}
+
+func (m *proximoMsg) Key() []byte {
+	// If no key is provided, use the message as the key,
+	// this is the default behaviour of substrate anyway
+	if len(m.msg.GetKey()) == 0 {
+		return m.msg.GetData()
+	}
+	return m.msg.GetKey()
 }
