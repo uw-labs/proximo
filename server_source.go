@@ -48,8 +48,9 @@ func (s *SourceServer) Consume(stream proto.MessageSource_ConsumeServer) error {
 	g.Go(func() error {
 		return s.sendMessages(ctx, stream, messages, toAck)
 	})
+
+	var req *proto.StartConsumeRequest
 	g.Go(func() error {
-		var req *proto.StartConsumeRequest
 		select {
 		case req = <-startRequest:
 		case <-ctx.Done():
@@ -68,7 +69,7 @@ func (s *SourceServer) Consume(stream proto.MessageSource_ConsumeServer) error {
 	if err := g.Wait(); err != nil {
 		return err
 	}
-	return errConnectionClosed
+	return status.Errorf(codes.Unavailable, "backend connection was closed for topic %s and consumer %s", req.Topic, req.Consumer)
 }
 
 // receiveSourceStream is a subset of proto.MessageSource_ConsumeServer that only exposes the receive method
