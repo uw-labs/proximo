@@ -10,10 +10,8 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
-	"google.golang.org/grpc/status"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
@@ -136,7 +134,7 @@ func TestConsumeServer_Consume(t *testing.T) {
 		consumed = append(consumed, msg)
 		return nil
 	})
-	assert.Equal(status.Code(err), codes.Unavailable)
+	assert.NoError(err)
 	assert.Equal(len(expected), len(consumed))
 
 	for i, msg := range expected {

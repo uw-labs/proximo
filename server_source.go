@@ -15,11 +15,10 @@ import (
 )
 
 var (
-	errStartedTwice     = status.Error(codes.InvalidArgument, "consumption already started")
-	errInvalidConfirm   = status.Error(codes.InvalidArgument, "invalid confirmation")
-	errNotConnected     = status.Error(codes.InvalidArgument, "not connected to a topic")
-	errInvalidRequest   = status.Error(codes.InvalidArgument, "invalid consumer request - this is possibly a bug in your client library")
-	errConnectionClosed = status.Error(codes.Unavailable, "backend connection was closed")
+	errStartedTwice   = status.Error(codes.InvalidArgument, "consumption already started")
+	errInvalidConfirm = status.Error(codes.InvalidArgument, "invalid confirmation")
+	errNotConnected   = status.Error(codes.InvalidArgument, "not connected to a topic")
+	errInvalidRequest = status.Error(codes.InvalidArgument, "invalid consumer request - this is possibly a bug in your client library")
 )
 
 type SourceServer struct {
@@ -68,7 +67,11 @@ func (s *SourceServer) Consume(stream proto.MessageSource_ConsumeServer) error {
 	if err := g.Wait(); err != nil {
 		return err
 	}
-	return errConnectionClosed
+
+	if err := sCtx.Err(); err == context.Canceled {
+		return status.Error(codes.Canceled, err.Error())
+	}
+	return sCtx.Err()
 }
 
 // receiveSourceStream is a subset of proto.MessageSource_ConsumeServer that only exposes the receive method
