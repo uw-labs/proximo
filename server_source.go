@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"errors"
 	"github.com/uw-labs/proximo/internal/id"
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
@@ -68,7 +69,7 @@ func (s *SourceServer) Consume(stream proto.MessageSource_ConsumeServer) error {
 		return err
 	}
 
-	if err := sCtx.Err(); err == context.Canceled {
+	if err := sCtx.Err(); errors.Is(err, context.Canceled) {
 		return status.Error(codes.Canceled, err.Error())
 	}
 	return sCtx.Err()
