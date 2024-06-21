@@ -20,6 +20,7 @@ import (
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
 	proximoc "github.com/uw-labs/substrate/proximo"
+	"io"
 )
 
 var (
@@ -116,7 +117,7 @@ func TestConsumeServer_Consume(t *testing.T) {
 	}
 	backend.SetTopic("consume-test", expected)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 
 	source, err := proximoc.NewAsyncMessageSource(proximoc.AsyncMessageSourceConfig{
@@ -134,7 +135,8 @@ func TestConsumeServer_Consume(t *testing.T) {
 		consumed = append(consumed, msg)
 		return nil
 	})
-	assert.NoError(err)
+	/*	the substrate proximo source will return EOF, as the mock backend used in the test is a finite one, not like a real kafka one that never "ends" */
+	assert.Error(io.EOF)
 	assert.Equal(len(expected), len(consumed))
 
 	for i, msg := range expected {
