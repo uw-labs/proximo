@@ -50,7 +50,8 @@ func (s *SinkServer) Publish(stream proto.MessageSink_PublishServer) error {
 	if err := g.Wait(); err != nil {
 		return err
 	}
-	return errConnectionClosed
+
+	return sCtx.Err()
 }
 
 // receiveSinkStream is a subset of proto.MessageSink_PublishServer that only exposes the receive method
