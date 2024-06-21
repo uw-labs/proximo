@@ -5,9 +5,6 @@ import (
 	"io"
 	"strings"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/pkg/errors"
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
@@ -54,9 +51,6 @@ func (s *SinkServer) Publish(stream proto.MessageSink_PublishServer) error {
 		return err
 	}
 
-	if err := sCtx.Err(); err == context.Canceled {
-		return status.Error(codes.Canceled, err.Error())
-	}
 	return sCtx.Err()
 }
 
