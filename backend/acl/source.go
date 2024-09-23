@@ -6,6 +6,8 @@ import (
 	"github.com/uw-labs/proximo"
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type AsyncSourceFactory struct {
@@ -20,7 +22,7 @@ func (s AsyncSourceFactory) NewAsyncSource(ctx context.Context, req *proto.Start
 	}
 
 	if !containsRegex(scope.Consume, req.Topic) {
-		return nil, ErrUnauthorized
+		return nil, status.Errorf(codes.PermissionDenied, "no consume permissions for topic %v", req.Topic)
 	}
 
 	return s.Next.NewAsyncSource(ctx, req)

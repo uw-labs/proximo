@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -85,7 +87,14 @@ clients:
 	ctx := createCtx("dog-consumer", "123")
 	_, err = c.GetClientScope(ctx)
 
-	assert.Equal(err, ErrUnauthorized)
+	assertPermissionDenied(t, err, "passwords do not match")
+}
+
+func assertPermissionDenied(t *testing.T, err error, expString string) {
+	s, ok := status.FromError(err)
+	require.True(t, ok)
+	require.Equal(t, codes.PermissionDenied, s.Code())
+	require.ErrorContains(t, err, expString)
 }
 
 func Test_ClientWithNoAuthHasDefaultAccess(t *testing.T) {

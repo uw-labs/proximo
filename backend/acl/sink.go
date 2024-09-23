@@ -6,6 +6,8 @@ import (
 	"github.com/uw-labs/proximo"
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type AsyncSinkFactory struct {
@@ -20,7 +22,7 @@ func (s AsyncSinkFactory) NewAsyncSink(ctx context.Context, req *proto.StartPubl
 	}
 
 	if !containsRegex(scope.Publish, req.Topic) {
-		return nil, ErrUnauthorized
+		return nil, status.Errorf(codes.PermissionDenied, "no publish permissions for topic %v", req.Topic)
 	}
 
 	return s.Next.NewAsyncSink(ctx, req)
