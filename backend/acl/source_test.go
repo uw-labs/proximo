@@ -9,7 +9,6 @@ import (
 )
 
 func Test_FactoryPublishOnlyClientCannotConsume(t *testing.T) {
-	assert := require.New(t)
 
 	c, err := ConfigFromString(fmt.Sprintf(`
 default:
@@ -35,7 +34,7 @@ clients:
 		Topic: "dogs",
 	})
 
-	assert.Equal(err, ErrUnauthorized)
+	assertPermissionDenied(t, err, "no consume permissions for topic dogs")
 }
 
 func Test_FactoryConsumeOnlyClientCanConsume(t *testing.T) {

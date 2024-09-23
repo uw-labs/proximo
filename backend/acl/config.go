@@ -16,11 +16,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var (
-	// ErrUnauthorized indicates that a client doesn't have access to a resource
-	ErrUnauthorized = status.Errorf(codes.PermissionDenied, "unauthorised")
-)
-
 // Config allows retrieve of access scope for the current client
 type Config interface {
 	GetClientScope(ctx context.Context) (*Scope, error)
@@ -103,29 +98,29 @@ func (s *config) GetClientScope(ctx context.Context) (*Scope, error) {
 
 	basicAuth, err := grpc_auth.AuthFromMD(ctx, "Bearer")
 	if err != nil {
-		return nil, ErrUnauthorized
+		return nil, status.Errorf(codes.PermissionDenied, "failed getting Bearrer auth, %v", err)
 	}
 
 	payload, err := base64.StdEncoding.DecodeString(basicAuth)
 	if err != nil {
-		return nil, ErrUnauthorized
+		return nil, status.Errorf(codes.PermissionDenied, "failed getting payload: %v", err)
 	}
 
 	pair := strings.SplitN(string(payload), ":", 2)
 
 	if len(pair) != 2 {
-		return nil, ErrUnauthorized
+		return nil, status.Errorf(codes.PermissionDenied, "malformed payload: should contain 2 pairs, but got %d", len(pair))
 	}
 
 	id, secret := pair[0], pair[1]
 
 	hashPass, ok := s.auth[id]
 	if !ok {
-		return nil, ErrUnauthorized
+		return nil, status.Errorf(codes.PermissionDenied, "no password configured for id %v", id)
 	}
 
 	if err := bcrypt.CompareHashAndPassword(hashPass, []byte(secret)); err != nil {
-		return nil, ErrUnauthorized
+		return nil, status.Errorf(codes.PermissionDenied, "passwords do not match for id %v", id)
 	}
 
 	return s.scopes[id], nil

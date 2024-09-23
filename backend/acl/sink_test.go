@@ -11,7 +11,6 @@ import (
 )
 
 func Test_FactoryConsumeOnlyClientCannotPublish(t *testing.T) {
-	assert := require.New(t)
 
 	c, err := ConfigFromString(fmt.Sprintf(`
 default:
@@ -37,7 +36,7 @@ clients:
 		Topic: "dogs",
 	})
 
-	assert.Equal(err, ErrUnauthorized)
+	assertPermissionDenied(t, err, "no publish permissions for topic dogs")
 }
 
 func Test_FactoryPublishOnlyClientCanPublish(t *testing.T) {
