@@ -24,7 +24,7 @@ func (s memSink) PublishMessages(ctx context.Context, acks chan<- substrate.Mess
 			select {
 			case s.backend.incomingMessages <- &produceReq{topic: s.config.GetTopic(), message: msg}:
 				select {
-				case acks <- msg:
+				case toAck <- msg:
 				case <-ctx.Done():
 					return nil
 				}
