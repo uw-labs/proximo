@@ -3,7 +3,6 @@ package proximo
 import (
 	"context"
 	"io"
-	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -85,13 +84,13 @@ func (s *SourceServer) receiveConfirmations(ctx context.Context, stream receiveS
 			if err == io.EOF {
 				return nil
 			}
-			if strings.HasSuffix(err.Error(), "context canceled") {
-				return nil
-			}
-			return err
+		if code := status.Code(err); code == codes.Canceled {
+			return nil
 		}
-		switch {
-		case msg.GetStartRequest() != nil:
+		return err
+	}
+	switch {
+	case msg.GetStartRequest() != nil:
 			if started {
 				return errStartedTwice
 			}
@@ -148,7 +147,7 @@ func (s *SourceServer) sendMessages(ctx context.Context, stream sendSourceStream
 			}
 			err := stream.Send(pMsg)
 			if err != nil {
-				if strings.HasSuffix(err.Error(), "context canceled") {
+				if code := status.Code(err); code == codes.Canceled {
 					return nil
 				}
 				return err

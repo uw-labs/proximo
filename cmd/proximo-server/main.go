@@ -11,7 +11,6 @@ import (
 	"time"
 
 	cli "github.com/jawher/mow.cli"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
@@ -190,7 +189,7 @@ func parseEndpoints(endpoints string) map[string]bool {
 func listenAndServe(sourceFactory proximo.AsyncSourceFactory, sinkFactory proximo.AsyncSinkFactory, port int, debug bool) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
-		return errors.Wrap(err, "failed to listen")
+		return fmt.Errorf("failed to listen: %w", err)
 	}
 	defer lis.Close()
 
@@ -218,7 +217,7 @@ func listenAndServe(sourceFactory proximo.AsyncSourceFactory, sinkFactory proxim
 	go func() { errCh <- grpcServer.Serve(lis) }()
 	select {
 	case err := <-errCh:
-		return errors.Wrap(err, "failed to serve grpc")
+		return fmt.Errorf("failed to serve grpc: %w", err)
 	case <-sigCh:
 		return nil
 	}

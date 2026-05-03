@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -31,7 +30,7 @@ var (
 func Setup() error {
 	lis, err := net.Listen("tcp", ":0")
 	if err != nil {
-		return errors.Wrap(err, "failed to listen")
+		return fmt.Errorf("failed to listen: %w", err)
 	}
 	serverAddr = lis.Addr().String()
 
@@ -53,9 +52,9 @@ func Setup() error {
 	}()
 
 	// Wait for server to start
-	cc, err := grpc.Dial(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	cc, err := grpc.NewClient(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return errors.Wrap(err, "failed to open client connection")
+		return fmt.Errorf("failed to open client connection: %w", err)
 	}
 
 	return cc.Close()

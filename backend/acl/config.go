@@ -98,7 +98,7 @@ func (s *config) GetClientScope(ctx context.Context) (*Scope, error) {
 
 	basicAuth, err := grpc_auth.AuthFromMD(ctx, "Bearer")
 	if err != nil {
-		return nil, status.Errorf(codes.PermissionDenied, "failed getting Bearrer auth, %v", err)
+		return nil, status.Errorf(codes.PermissionDenied, "failed getting Bearer auth, %v", err)
 	}
 
 	payload, err := base64.StdEncoding.DecodeString(basicAuth)
