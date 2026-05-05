@@ -20,15 +20,14 @@ import (
 // drained acks.  With the fix messages route through toAck and
 // sendConfirmations buffers them in toConfirm.
 func TestMemSink_PublishMessagesBuffersConfirmations(t *testing.T) {
-	assert := require.New(t)
-
 	b := NewBackend().(*memBackend)
 	sink, err := b.NewAsyncSink(context.Background(), &proto.StartPublishRequest{Topic: "test-topic"})
-	assert.NoError(err)
+	require.NoError(t, err)
 
 	acks := make(chan substrate.Message)     // unbuffered - back-pressure
 	msgs := make(chan substrate.Message, 10) // buffered
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	go func() {
 		for i := 0; i < 3; i++ {
@@ -42,17 +41,12 @@ func TestMemSink_PublishMessagesBuffersConfirmations(t *testing.T) {
 		close(done)
 	}()
 
-	// Give PublishMessages time to process the three messages.
-	// With the buggy code it blocks on the first ack, so only one
-	// message reaches the backend.  With the fix,
-	// sendConfirmations buffers all three in toConfirm while
-	// waiting for acks to drain, so all three reach the backend.
-	time.Sleep(300 * time.Millisecond)
+	require.Eventually(t, func() bool {
+		return b.messageCount("test-topic") == 3
+	}, 5*time.Second, 10*time.Millisecond, "expected all three messages to be buffered in the backend")
 
 	cancel()
 	<-done
-
-	assert.Equal(3, b.messageCount("test-topic"), "expected all three messages to be buffered in the backend")
 }
 
 type testMsg struct {
