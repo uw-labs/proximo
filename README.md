@@ -20,9 +20,7 @@ It already supports a number of popular queueing systems, and adding new ones is
 
 ## Server
 
-This is the Proximo server implementation, written in Go
-
-[proximo server](proximo-server/README.md)
+This is the Proximo server implementation, written in Go.
 
 ## Proximo client libraries
 

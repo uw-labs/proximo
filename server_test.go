@@ -3,36 +3,36 @@ package proximo
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
-
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/require"
 
 	"github.com/uw-labs/proximo/backend/mock"
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
 	proximoc "github.com/uw-labs/substrate/proximo"
-	"io"
 )
 
 var (
 	backend    *mock.Backend
 	grpcServer *grpc.Server
+	serverAddr string
 )
 
 func Setup() error {
-	lis, err := net.Listen("tcp", ":6868")
+	lis, err := net.Listen("tcp", ":0")
 	if err != nil {
-		return errors.Wrap(err, "failed to listen")
+		return fmt.Errorf("failed to listen: %w", err)
 	}
+	serverAddr = lis.Addr().String()
 
 	opts := []grpc.ServerOption{
 		grpc.KeepaliveParams(keepalive.ServerParameters{
@@ -52,9 +52,9 @@ func Setup() error {
 	}()
 
 	// Wait for server to start
-	cc, err := grpc.Dial("localhost:6868", grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	cc, err := grpc.NewClient(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return errors.Wrap(err, "failed to open client connection")
+		return fmt.Errorf("failed to open client connection: %w", err)
 	}
 
 	return cc.Close()
@@ -86,7 +86,7 @@ func TestProduceServer_Publish(t *testing.T) {
 	defer cancel()
 
 	sink, err := proximoc.NewAsyncMessageSink(proximoc.AsyncMessageSinkConfig{
-		Broker:   "localhost:6868",
+		Broker:   serverAddr,
 		Topic:    "publish-test",
 		Insecure: true,
 	})
@@ -121,7 +121,7 @@ func TestConsumeServer_Consume(t *testing.T) {
 	defer cancel()
 
 	source, err := proximoc.NewAsyncMessageSource(proximoc.AsyncMessageSourceConfig{
-		Broker:        "localhost:6868",
+		Broker:        serverAddr,
 		Topic:         "consume-test",
 		ConsumerGroup: "test-consumer-group",
 		Insecure:      true,
@@ -135,8 +135,8 @@ func TestConsumeServer_Consume(t *testing.T) {
 		consumed = append(consumed, msg)
 		return nil
 	})
-	/*	the substrate proximo source will return EOF, as the mock backend used in the test is a finite one, not like a real kafka one that never "ends" */
-	assert.Error(io.EOF)
+	/* the substrate proximo source will return EOF, as the mock backend used in the test is a finite one, not like a real kafka one that never "ends" */
+	assert.ErrorIs(err, io.EOF)
 	assert.Equal(len(expected), len(consumed))
 
 	for i, msg := range expected {

@@ -11,8 +11,6 @@ import (
 	"time"
 
 	cli "github.com/jawher/mow.cli"
-	"github.com/nats-io/stan.go"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
@@ -20,7 +18,6 @@ import (
 	"github.com/uw-labs/proximo/backend/acl"
 	"github.com/uw-labs/proximo/backend/kafka"
 	"github.com/uw-labs/proximo/backend/mem"
-	"github.com/uw-labs/proximo/backend/natsstreaming"
 	"github.com/uw-labs/proximo/proto"
 )
 
@@ -122,58 +119,6 @@ func main() {
 		}
 	})
 
-	app.Command("nats-streaming", "Use NATS streaming backend", func(cmd *cli.Cmd) {
-		url := cmd.String(cli.StringOpt{
-			Name:   "url",
-			Value:  "nats://localhost:4222",
-			Desc:   "NATS url",
-			EnvVar: "PROXIMO_NATS_URL",
-		})
-		cid := cmd.String(cli.StringOpt{
-			Name:   "cid",
-			Value:  "test-cluster",
-			Desc:   "cluster id",
-			EnvVar: "PROXIMO_NATS_CLUSTER_ID",
-		})
-		maxInflight := cmd.Int(cli.IntOpt{
-			Name:   "max-inflight",
-			Value:  stan.DefaultMaxInflight,
-			Desc:   "maximum number of unacknowledged messages",
-			EnvVar: "PROXIMO_NATS_MAX_INFLIGHT",
-		})
-		pingIntervalSeconds := cmd.Int(cli.IntOpt{
-			Name:   "ping-interval",
-			Value:  3,
-			Desc:   "interval in seconds for connection pings",
-			EnvVar: "PROXIMO_NATS_PING_INTERVAL_SECONDS",
-		})
-		pingNumTimeouts := cmd.Int(cli.IntOpt{
-			Name:   "num-ping-timeouts",
-			Value:  5,
-			Desc:   "number of pings to time out before connection considered broken",
-			EnvVar: "PROXIMO_NATS_NUM_PING_TIMEOUTS",
-		})
-		cmd.Action = func() {
-			if enabled[consumeEndpoint] {
-				sourceFactory = natsstreaming.AsyncSourceFactory{
-					URL:                    *url,
-					ClusterID:              *cid,
-					MaxInflight:            *maxInflight,
-					ConnectionNumPings:     *pingNumTimeouts,
-					ConnectionPingInterval: *pingIntervalSeconds,
-				}
-			}
-			if enabled[publishEndpoint] {
-				sinkFactory = natsstreaming.AsyncSinkFactory{
-					URL:       *url,
-					ClusterID: *cid,
-				}
-			}
-
-			log.Printf("Using NATS streaming server at %s with cluster id %s and max inflight %v\n", *url, *cid, *maxInflight)
-		}
-	})
-
 	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
 		cmd.Action = func() {
 			h := mem.NewBackend()
@@ -244,7 +189,7 @@ func parseEndpoints(endpoints string) map[string]bool {
 func listenAndServe(sourceFactory proximo.AsyncSourceFactory, sinkFactory proximo.AsyncSinkFactory, port int, debug bool) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
-		return errors.Wrap(err, "failed to listen")
+		return fmt.Errorf("failed to listen: %w", err)
 	}
 	defer lis.Close()
 
@@ -272,7 +217,7 @@ func listenAndServe(sourceFactory proximo.AsyncSourceFactory, sinkFactory proxim
 	go func() { errCh <- grpcServer.Serve(lis) }()
 	select {
 	case err := <-errCh:
-		return errors.Wrap(err, "failed to serve grpc")
+		return fmt.Errorf("failed to serve grpc: %w", err)
 	case <-sigCh:
 		return nil
 	}

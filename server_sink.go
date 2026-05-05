@@ -2,10 +2,12 @@ package proximo
 
 import (
 	"context"
+	"fmt"
 	"io"
-	"strings"
 
-	"github.com/pkg/errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/uw-labs/proximo/proto"
 	"github.com/uw-labs/substrate"
 	"github.com/uw-labs/sync/gogroup"
@@ -68,9 +70,9 @@ func (s *SinkServer) receiveMessages(ctx context.Context, stream receiveSinkStre
 			if err == io.EOF {
 				return nil
 			}
-			if strings.HasSuffix(err.Error(), "context canceled") {
-				return nil
-			}
+		if code := status.Code(err); code == codes.Canceled {
+			return nil
+		}
 			return err
 		}
 		switch {
@@ -111,7 +113,7 @@ func (s *SinkServer) sendConfirmations(ctx context.Context, stream sendSinkStrea
 		case msg := <-forClient:
 			pMsg, ok := msg.(*proximoMsg)
 			if !ok {
-				return errors.Errorf("unexpected message: %v", pMsg)
+				return fmt.Errorf("unexpected message: %v", pMsg)
 			}
 			if err := stream.Send(&proto.Confirmation{MsgID: pMsg.msg.Id}); err != nil {
 				return err

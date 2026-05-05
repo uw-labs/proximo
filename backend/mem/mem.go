@@ -2,6 +2,7 @@ package mem
 
 import (
 	"context"
+	"sync"
 
 	"github.com/uw-labs/proximo"
 	"github.com/uw-labs/proximo/proto"
@@ -22,6 +23,7 @@ type memBackend struct {
 	incomingMessages chan *produceReq
 	subs             chan *sub
 
+	mu      sync.RWMutex
 	last100 map[string][]substrate.Message
 }
 
@@ -39,7 +41,7 @@ func (h *memBackend) NewAsyncSink(ctx context.Context, req *proto.StartPublishRe
 	}, nil
 }
 
-func (h memBackend) loop() {
+func (h *memBackend) loop() {
 	subs := make(map[string]map[string][]*sub)
 
 	for {
@@ -82,22 +84,34 @@ func (h memBackend) loop() {
 			}
 			subs[inm.topic] = remainingConsumers
 
+			h.mu.Lock()
 			h.last100[inm.topic] = append(h.last100[inm.topic], inm.message)
 			for len(h.last100[inm.topic]) > 100 {
 				h.last100[inm.topic] = h.last100[inm.topic][1:]
 			}
+			h.mu.Unlock()
 		}
 	}
 }
 
 func (h *memBackend) sendLast100(s *sub) {
-	for _, m := range h.last100[s.topic] {
+	h.mu.RLock()
+	msgs := h.last100[s.topic]
+	h.mu.RUnlock()
+
+	for _, m := range msgs {
 		select {
 		case s.msgs <- m:
 		case <-s.ctx.Done():
 			return
 		}
 	}
+}
+
+func (h *memBackend) messageCount(topic string) int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.last100[topic])
 }
 
 type produceReq struct {
