@@ -25,7 +25,13 @@ type SourceServer struct {
 	SkipDiscard   bool
 }
 
-func (s *SourceServer) Consume(stream proto.MessageSource_ConsumeServer) error {
+func (s *SourceServer) Consume(stream proto.MessageSource_ConsumeServer) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = status.Errorf(codes.Internal, "panic: %v", r)
+		}
+	}()
+
 	sCtx := stream.Context()
 
 	g, ctx := gogroup.New(sCtx)
@@ -63,11 +69,12 @@ func (s *SourceServer) Consume(stream proto.MessageSource_ConsumeServer) error {
 		return source.ConsumeMessages(ctx, messages, acks)
 	})
 
-	if err := g.Wait(); err != nil {
-		return err
+	if err = g.Wait(); err != nil {
+		return
 	}
 
-	return sCtx.Err()
+	err = sCtx.Err()
+	return
 }
 
 // receiveSourceStream is a subset of proto.MessageSource_ConsumeServer that only exposes the receive method
