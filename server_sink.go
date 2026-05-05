@@ -17,7 +17,13 @@ type SinkServer struct {
 	SinkFactory AsyncSinkFactory
 }
 
-func (s *SinkServer) Publish(stream proto.MessageSink_PublishServer) error {
+func (s *SinkServer) Publish(stream proto.MessageSink_PublishServer) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = status.Errorf(codes.Internal, "panic: %v", r)
+		}
+	}()
+
 	sCtx := stream.Context()
 
 	g, ctx := gogroup.New(sCtx)
@@ -49,11 +55,12 @@ func (s *SinkServer) Publish(stream proto.MessageSink_PublishServer) error {
 		return sink.PublishMessages(ctx, acks, messages)
 	})
 
-	if err := g.Wait(); err != nil {
-		return err
+	if err = g.Wait(); err != nil {
+		return
 	}
 
-	return sCtx.Err()
+	err = sCtx.Err()
+	return
 }
 
 // receiveSinkStream is a subset of proto.MessageSink_PublishServer that only exposes the receive method
