@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -116,11 +117,13 @@ func (s *config) GetClientScope(ctx context.Context) (*Scope, error) {
 
 	hashPass, ok := s.auth[id]
 	if !ok {
-		return nil, status.Errorf(codes.PermissionDenied, "no password configured for id %v", id)
+		log.Printf("acl: no password configured for client %q", id)
+		return nil, status.Error(codes.PermissionDenied, "invalid credentials")
 	}
 
 	if err := bcrypt.CompareHashAndPassword(hashPass, []byte(secret)); err != nil {
-		return nil, status.Errorf(codes.PermissionDenied, "passwords do not match for id %v", id)
+		log.Printf("acl: wrong password for client %q", id)
+		return nil, status.Error(codes.PermissionDenied, "invalid credentials")
 	}
 
 	return s.scopes[id], nil

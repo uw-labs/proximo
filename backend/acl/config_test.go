@@ -87,7 +87,7 @@ clients:
 	ctx := createCtx("dog-consumer", "123")
 	_, err = c.GetClientScope(ctx)
 
-	assertPermissionDenied(t, err, "passwords do not match")
+	assertPermissionDenied(t, err, "invalid credentials")
 }
 
 func assertPermissionDenied(t *testing.T, err error, expString string) {
