@@ -156,6 +156,8 @@ func (s *SourceServer) sendMessages(ctx context.Context, stream sendSourceStream
 	}
 }
 
+const maxPendingAcks = 10000
+
 func (s *SourceServer) handleAcks(ctx context.Context, confirmations <-chan string, acks chan<- substrate.Message, toAck <-chan *ackMsg) error {
 	ackMap := make(map[string]substrate.Message)
 
@@ -168,6 +170,9 @@ func (s *SourceServer) handleAcks(ctx context.Context, confirmations <-chan stri
 				if dMsg, ok := aMsg.msg.(substrate.DiscardableMessage); ok {
 					dMsg.DiscardPayload() // Discard payload to save space
 				}
+			}
+			if len(ackMap) >= maxPendingAcks {
+				return status.Errorf(codes.ResourceExhausted, "too many unacknowledged messages")
 			}
 			ackMap[aMsg.id] = aMsg.msg
 		case msgID := <-confirmations:
