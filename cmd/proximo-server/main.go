@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	cli "github.com/jawher/mow.cli"
+	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
@@ -32,120 +32,144 @@ const (
 )
 
 func main() {
-	var (
-		sourceFactory proximo.AsyncSourceFactory
-		sinkFactory   proximo.AsyncSinkFactory
-		enabled       map[string]bool
-	)
-
-	app := cli.App("proximo", "GRPC Proxy gateway for message queue systems")
-
-	port := app.Int(cli.IntOpt{
-		Name:   "port",
-		Value:  6868,
-		Desc:   "Port to listen on",
-		EnvVar: "PROXIMO_PORT",
-	})
-
-	endpoints := app.String(cli.StringOpt{
-		Name:   "endpoints",
-		Value:  fmt.Sprintf("%s,%s", consumeEndpoint, publishEndpoint),
-		Desc:   "The proximo endpoints to expose (consume, publish)",
-		EnvVar: "PROXIMO_ENDPOINTS",
-	})
-
-	debug := app.Bool(cli.BoolOpt{
-		Name:   "debug",
-		Desc:   "Enable debug mode, which will produce log output, and may be more resource intensive",
-		Value:  false,
-		EnvVar: "PROXIMO_DEBUG",
-	})
-
-	configFile := app.String(cli.StringOpt{
-		Name:   "acl-config",
-		Desc:   "ACL Config file",
-		EnvVar: "PROXIMO_ACL_CONFIG",
-	})
-
-	app.Before = func() {
-		enabled = parseEndpoints(*endpoints)
+	app := &cli.App{
+		Name:  "proximo",
+		Usage: "GRPC Proxy gateway for message queue systems",
+		Flags: []cli.Flag{
+			&cli.IntFlag{
+				Name:    "port",
+				Value:   6868,
+				Usage:   "Port to listen on",
+				EnvVars: []string{"PROXIMO_PORT"},
+			},
+			&cli.StringFlag{
+				Name:    "endpoints",
+				Value:   fmt.Sprintf("%s,%s", consumeEndpoint, publishEndpoint),
+				Usage:   "The proximo endpoints to expose (consume, publish)",
+				EnvVars: []string{"PROXIMO_ENDPOINTS"},
+			},
+			&cli.BoolFlag{
+				Name:    "debug",
+				Usage:   "Enable debug mode, which will produce log output, and may be more resource intensive",
+				Value:   false,
+				EnvVars: []string{"PROXIMO_DEBUG"},
+			},
+			&cli.StringFlag{
+				Name:    "acl-config",
+				Usage:   "ACL Config file",
+				EnvVars: []string{"PROXIMO_ACL_CONFIG"},
+			},
+		},
+		Commands: []*cli.Command{
+			{
+				Name:  "kafka",
+				Usage: "Use kafka backend",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:    "brokers",
+						Value:   "localhost:9092",
+						Usage:   `Broker addresses e.g., "server1:9092,server2:9092"`,
+						EnvVars: []string{"PROXIMO_KAFKA_BROKERS"},
+					},
+					&cli.StringFlag{
+						Name:    "version",
+						Usage:   "Kafka Version e.g. 1.1.1, 0.10.2.0",
+						EnvVars: []string{"PROXIMO_KAFKA_VERSION"},
+					},
+					&cli.IntFlag{
+						Name:    "consumer-session-timeout",
+						Usage:   "Duration in seconds after which consumer session should timeout.",
+						EnvVars: []string{"PROXIMO_KAFKA_CONSUMER_SESSION_TIMEOUT"},
+					},
+					&cli.IntFlag{
+						Name:    "max-message-bytes",
+						Usage:   "Max message bytes to use in client config. 0 means client default",
+						Value:   0,
+						EnvVars: []string{"PROXIMO_KAFKA_MAX_MESSAGE_BYTES"},
+					},
+				},
+				Action: func(c *cli.Context) error {
+					return runWithKafka(c)
+				},
+			},
+			{
+				Name:  "mem",
+				Usage: "Use in-memory testing backend",
+				Action: func(c *cli.Context) error {
+					return runWithMem(c)
+				},
+			},
+		},
 	}
-
-	app.Command("kafka", "Use kafka backend", func(cmd *cli.Cmd) {
-		brokerString := cmd.String(cli.StringOpt{
-			Name:   "brokers",
-			Value:  "localhost:9092",
-			Desc:   "Broker addresses e.g., \"server1:9092,server2:9092\"",
-			EnvVar: "PROXIMO_KAFKA_BROKERS",
-		})
-		kafkaVersion := cmd.String(cli.StringOpt{
-			Name:   "version",
-			Desc:   "Kafka Version e.g. 1.1.1, 0.10.2.0",
-			EnvVar: "PROXIMO_KAFKA_VERSION",
-		})
-		kafkaConsumerSessionTimeout := cmd.Int(cli.IntOpt{
-			Name:   "consumer-session-timeout",
-			Desc:   "Duration in seconds after which consumer session should timeout.",
-			EnvVar: "PROXIMO_KAFKA_CONSUMER_SESSION_TIMEOUT",
-		})
-		kafkaMaxMessageBytes := cmd.Int(cli.IntOpt{
-			Name:   "max-message-bytes",
-			Desc:   "Max message bytes to use in client config.  0 means client default",
-			EnvVar: "PROXIMO_KAFKA_MAX_MESSAGE_BYTES",
-			Value:  0,
-		})
-
-		cmd.Action = func() {
-			brokers := strings.Split(*brokerString, ",")
-
-			if enabled[consumeEndpoint] {
-				sourceFactory = &kafka.AsyncSourceFactory{
-					Brokers:        brokers,
-					Version:        *kafkaVersion,
-					SessionTimeout: time.Duration(*kafkaConsumerSessionTimeout) * time.Second,
-					Debug:          *debug,
-				}
-			}
-			if enabled[publishEndpoint] {
-				sinkFactory = &kafka.AsyncSinkFactory{
-					Brokers:         brokers,
-					Version:         *kafkaVersion,
-					Debug:           *debug,
-					MaxMessageBytes: *kafkaMaxMessageBytes,
-				}
-			}
-
-			log.Printf("Using kafka at %s\n", brokers)
-		}
-	})
-
-	app.Command("mem", "Use in-memory testing backend", func(cmd *cli.Cmd) {
-		cmd.Action = func() {
-			h := mem.NewBackend()
-
-			if enabled[consumeEndpoint] {
-				sourceFactory = h
-			}
-			if enabled[publishEndpoint] {
-				sinkFactory = h
-			}
-
-			log.Printf("Using in memory testing backend")
-		}
-	})
 
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
+}
 
-	if *debug {
+func runWithKafka(c *cli.Context) error {
+	enabled := parseEndpoints(c.String("endpoints"))
+	var (
+		sourceFactory proximo.AsyncSourceFactory
+		sinkFactory   proximo.AsyncSinkFactory
+	)
+
+	brokers := strings.Split(c.String("brokers"), ",")
+
+	if enabled[consumeEndpoint] {
+		sourceFactory = &kafka.AsyncSourceFactory{
+			Brokers:        brokers,
+			Version:        c.String("version"),
+			SessionTimeout: time.Duration(c.Int("consumer-session-timeout")) * time.Second,
+			Debug:          c.Bool("debug"),
+		}
+	}
+	if enabled[publishEndpoint] {
+		sinkFactory = &kafka.AsyncSinkFactory{
+			Brokers:         brokers,
+			Version:         c.String("version"),
+			Debug:           c.Bool("debug"),
+			MaxMessageBytes: c.Int("max-message-bytes"),
+		}
+	}
+
+	log.Printf("Using kafka at %s\n", brokers)
+	return setupAndServe(c, sourceFactory, sinkFactory)
+}
+
+func runWithMem(c *cli.Context) error {
+	enabled := parseEndpoints(c.String("endpoints"))
+	var (
+		sourceFactory proximo.AsyncSourceFactory
+		sinkFactory   proximo.AsyncSinkFactory
+	)
+
+	h := mem.NewBackend()
+
+	if enabled[consumeEndpoint] {
+		sourceFactory = h
+	}
+	if enabled[publishEndpoint] {
+		sinkFactory = h
+	}
+
+	log.Printf("Using in memory testing backend")
+	return setupAndServe(c, sourceFactory, sinkFactory)
+}
+
+func setupAndServe(c *cli.Context, sourceFactory proximo.AsyncSourceFactory, sinkFactory proximo.AsyncSinkFactory) error {
+	port := c.Int("port")
+	debug := c.Bool("debug")
+	configFile := c.String("acl-config")
+
+	if debug {
 		log.Println("Running in debug mode. This means producing log output and disabling message discarding.")
 	}
 
-	if *configFile != "" {
-		cfg, err := acl.ConfigFromFile(*configFile)
+	if configFile != "" {
+		cfg, err := acl.ConfigFromFile(configFile)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 
 		if sourceFactory != nil {
@@ -163,11 +187,7 @@ func main() {
 		}
 	}
 
-	if err := listenAndServe(sourceFactory, sinkFactory, *port, *debug); err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println("Server terminated cleanly")
+	return listenAndServe(sourceFactory, sinkFactory, port, debug)
 }
 
 func parseEndpoints(endpoints string) map[string]bool {

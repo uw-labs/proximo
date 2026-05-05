@@ -9,40 +9,43 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"github.com/uw-labs/proximo/internal/id"
 	"github.com/uw-labs/substrate"
 	"github.com/uw-labs/substrate/proximo"
 )
 
 func main() {
-	app := cli.NewApp()
-	app.Name = "proximo client"
-	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name: "endpoint, e",
-		},
-		cli.StringFlag{
-			Name: "topic, t",
-		},
-	}
-	app.Commands = []cli.Command{
-		{
-			Name:  "produce",
-			Usage: "produce a message. Reads from STDIN",
-			Action: func(c *cli.Context) error {
-				return produce(c.GlobalString("endpoint"), c.GlobalString("topic"))
+	app := &cli.App{
+		Name:  "proximo-client",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "endpoint",
+				Aliases: []string{"e"},
+			},
+			&cli.StringFlag{
+				Name:    "topic",
+				Aliases: []string{"t"},
 			},
 		},
-		{
-			Name: "consume",
-			Action: func(c *cli.Context) error {
-				return consume(c.GlobalString("endpoint"), c.GlobalString("topic"), c.String("consumer-id"))
+		Commands: []*cli.Command{
+			{
+				Name:  "produce",
+				Usage: "produce a message. Reads from STDIN",
+				Action: func(c *cli.Context) error {
+					return produce(c.String("endpoint"), c.String("topic"))
+				},
 			},
-			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:  "consumer-id",
-					Usage: "The consumer ID to use.  Empty means use a random unique ID",
+			{
+				Name: "consume",
+				Action: func(c *cli.Context) error {
+					return consume(c.String("endpoint"), c.String("topic"), c.String("consumer-id"))
+				},
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "consumer-id",
+						Usage: "The consumer ID to use. Empty means use a random unique ID",
+					},
 				},
 			},
 		},

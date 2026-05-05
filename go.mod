@@ -5,9 +5,8 @@ go 1.26.2
 require (
 	github.com/bufbuild/buf v1.69.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
-	github.com/jawher/mow.cli v1.2.0
 	github.com/stretchr/testify v1.11.1
-	github.com/urfave/cli v1.22.17
+	github.com/urfave/cli/v2 v2.27.7
 	github.com/uw-labs/substrate v0.0.0-20220414133007-f8a269c291fb
 	github.com/uw-labs/sync v0.0.0-20220413223303-ecb5d1fd966e
 	golang.org/x/crypto v0.50.0
@@ -107,6 +106,7 @@ require (
 	github.com/tetratelabs/wazero v1.11.0 // indirect
 	github.com/tidwall/btree v1.8.1 // indirect
 	github.com/vbatts/tar-split v0.12.3 // indirect
+	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	go.lsp.dev/jsonrpc2 v0.10.0 // indirect
 	go.lsp.dev/pkg v0.0.0-20210717090340-384b27a52fb2 // indirect
 	go.lsp.dev/protocol v0.12.0 // indirect
