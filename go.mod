@@ -10,7 +10,7 @@ require (
 	github.com/uw-labs/substrate v0.0.0-20220414133007-f8a269c291fb
 	github.com/uw-labs/sync v0.0.0-20220413223303-ecb5d1fd966e
 	golang.org/x/crypto v0.50.0
-	google.golang.org/grpc v1.80.0
+	google.golang.org/grpc v1.82.1
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.6.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
